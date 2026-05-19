@@ -414,3 +414,11 @@ VALUES
 'corporate gifts, company gifts, employee gifting',
 '/uploads/seo-banner.jpg'
 );
+
+-- Fix: microsite.workarya.com -> microsite_backend.workarya.com
+UPDATE microsites
+SET url = 'http://microsite_backend.workarya.com/user_microsite/index.html?microsite_id='
+    || REPLACE(unique_id::text, '-', '')
+WHERE url IS NULL
+   OR url LIKE '%microsite.workarya.com%'
+   OR url NOT LIKE '%microsite_backend.workarya.com%';
