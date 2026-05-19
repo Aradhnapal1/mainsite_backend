@@ -16,6 +16,19 @@ namespace firstproject.Controllers
             _businessLayer = businessLayer;
         }
 
+        [HttpGet("by-id")]
+        public async Task<IActionResult> GetMicrositeByPublicId([FromQuery] string microsite_id)
+        {
+            if (string.IsNullOrWhiteSpace(microsite_id))
+                return BadRequest(new { status = false, message = "microsite_id required hai." });
+
+            var microsite = await _businessLayer.GetMicrositePublicByUniqueId(microsite_id);
+            if (microsite == null)
+                return NotFound(new { status = false, message = "Microsite nahi mila." });
+
+            return Ok(new { status = true, data = microsite });
+        }
+
         [HttpGet("home")]
         public async Task<IActionResult> GetMicrositeHome([FromQuery] string domain)
         {

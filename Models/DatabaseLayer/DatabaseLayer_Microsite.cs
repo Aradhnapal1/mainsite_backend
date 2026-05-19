@@ -18,6 +18,7 @@ namespace firstproject.Models.DatabaseLayer
         //================================================================Task MicroSite Task ============================================================== 
         Task<List<MicrositeModel>> GetMicrosite();
         Task<MicrositeModel> GetMicrositeById(long id);
+        Task<MicrositeModel?> GetMicrositeByUniqueId(string micrositeId);
         Task<MicrositeModel> CreateMicrosite(MicrositeModel model);
         Task<string> UpdateMicrosite(long id, MicrositeModel model);
         Task<string> DeleteMicrosite(long id);
@@ -299,6 +300,121 @@ CREATE TABLE IF NOT EXISTS assign_product (
                 if (!reader.IsDBNull(reader.GetOrdinal("domain")))
                 {
                     microsite.Domains.Add(reader["domain"].ToString());
+                }
+            }
+
+            return microsite;
+        }
+
+        public async Task<MicrositeModel?> GetMicrositeByUniqueId(string micrositeId)
+        {
+            if (string.IsNullOrWhiteSpace(micrositeId))
+                return null;
+
+            var normalizedId = micrositeId.Trim().Replace("-", "").ToLowerInvariant();
+
+            using var conn = new NpgsqlConnection(DbConnection);
+            await conn.OpenAsync();
+
+            const string sql = @"SELECT 
+                m.id,
+                m.name,
+                m.slug,
+                m.heading,
+                m.content,
+                m.address,
+                m.email,
+                m.mobile,
+                m.logo_image,
+                m.banner_image,
+                m.favicon,
+                m.url,
+                m.unique_id,
+                m.start_date,
+                m.end_date,
+                m.status,
+                d.domain,
+                t.header_color,
+                t.text_color,
+                t.background_color,
+                t.button_color,
+                t.button_text_color,
+                t.footer_color,
+                t.footer_text_color,
+                t.font_family,
+                s.meta_title,
+                s.meta_description,
+                s.meta_keywords,
+                s.og_image
+            FROM microsites m
+            LEFT JOIN microsite_domains d ON m.id = d.microsite_id
+            LEFT JOIN microsite_themes t ON m.id = t.microsite_id
+            LEFT JOIN microsite_seo s ON m.id = s.microsite_id
+            WHERE LOWER(REPLACE(m.unique_id::text, '-', '')) = @uid AND m.status = true";
+
+            using var cmd = new NpgsqlCommand(sql, conn);
+            cmd.Parameters.AddWithValue("@uid", normalizedId);
+
+            using var reader = await cmd.ExecuteReaderAsync();
+
+            MicrositeModel? microsite = null;
+
+            while (await reader.ReadAsync())
+            {
+                if (microsite == null)
+                {
+                    var uniqueId = reader["unique_id"]?.ToString();
+                    var dbUrl = reader["url"]?.ToString();
+
+                    microsite = new MicrositeModel
+                    {
+                        Id = reader.GetInt64(reader.GetOrdinal("id")),
+                        Name = reader["name"]?.ToString(),
+                        Slug = reader["slug"]?.ToString(),
+                        Heading = reader["heading"]?.ToString(),
+                        Content = reader["content"]?.ToString(),
+                        Address = reader["address"]?.ToString(),
+                        Email = reader["email"]?.ToString(),
+                        Mobile = reader["mobile"]?.ToString(),
+                        LogoImage = reader["logo_image"]?.ToString(),
+                        BannerImage = reader["banner_image"]?.ToString(),
+                        Favicon = reader["favicon"]?.ToString(),
+                        UniqueId = uniqueId,
+                        Url = BuildMicrositeRuntimeUrl(uniqueId, dbUrl),
+                        StartDate = reader.IsDBNull(reader.GetOrdinal("start_date"))
+                            ? null
+                            : reader.GetDateTime(reader.GetOrdinal("start_date")),
+                        EndDate = reader.IsDBNull(reader.GetOrdinal("end_date"))
+                            ? null
+                            : reader.GetDateTime(reader.GetOrdinal("end_date")),
+                        Status = reader.GetBoolean(reader.GetOrdinal("status")),
+                        Domains = new List<string>(),
+                        Theme = new MicrositeTheme
+                        {
+                            HeaderColor = reader["header_color"]?.ToString(),
+                            TextColor = reader["text_color"]?.ToString(),
+                            BackgroundColor = reader["background_color"]?.ToString(),
+                            ButtonColor = reader["button_color"]?.ToString(),
+                            ButtonTextColor = reader["button_text_color"]?.ToString(),
+                            FooterColor = reader["footer_color"]?.ToString(),
+                            FooterTextColor = reader["footer_text_color"]?.ToString(),
+                            FontFamily = reader["font_family"]?.ToString()
+                        },
+                        Seo = new MicrositeSeo
+                        {
+                            MetaTitle = reader["meta_title"]?.ToString(),
+                            MetaDescription = reader["meta_description"]?.ToString(),
+                            MetaKeywords = reader["meta_keywords"]?.ToString(),
+                            OgImage = reader["og_image"]?.ToString()
+                        }
+                    };
+                }
+
+                if (!reader.IsDBNull(reader.GetOrdinal("domain")))
+                {
+                    var domainValue = reader["domain"]?.ToString();
+                    if (!string.IsNullOrWhiteSpace(domainValue))
+                        microsite!.Domains.Add(domainValue);
                 }
             }
 
