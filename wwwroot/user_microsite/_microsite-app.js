@@ -1,5 +1,5 @@
 (function () {
-    var API_BASE = window.MICROSITE_API_BASE || "http://microsite_backend.workarya.com";
+    var API_BASE = window.MICROSITE_API_BASE || window.API_BASE || window.domain || "http://microsite_backend.workarya.com";
 
     function getContext() {
         var ctx = window.MICROSITE_CONTEXT || {};
