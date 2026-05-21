@@ -10,6 +10,7 @@ namespace firstproject.Models.BusinessLayer
     {
         Task<MicrositeResolvedData?> GetMicrositePublicData(string domain);
         Task<MicrositeModel?> GetMicrositePublicByUniqueId(string micrositeId);
+        Task<List<MicrositeAssignedProduct>> GetMicrositeProductsByUniqueId(string micrositeId);
         Task<List<MicrositeAssignedProduct>> GetMicrositeProducts(string domain);
         Task<IActionResult> SendMicrositeOtp(MicrositeOtpSendRequest request);
         Task<IActionResult> VerifyMicrositeOtp(MicrositeOtpVerifyRequest request);
@@ -34,6 +35,15 @@ namespace firstproject.Models.BusinessLayer
         {
             await _databaseLayer.EnsureMicrositePublicSchema();
             return await _databaseLayer.GetMicrositeByUniqueId(micrositeId);
+        }
+
+        public async Task<List<MicrositeAssignedProduct>> GetMicrositeProductsByUniqueId(string micrositeId)
+        {
+            await _databaseLayer.EnsureMicrositePublicSchema();
+            var microsite = await _databaseLayer.GetMicrositeByUniqueId(micrositeId);
+            if (microsite == null)
+                return new List<MicrositeAssignedProduct>();
+            return await _databaseLayer.GetMicrositeProducts(microsite.Id);
         }
 
         public async Task<List<MicrositeAssignedProduct>> GetMicrositeProducts(string domain)

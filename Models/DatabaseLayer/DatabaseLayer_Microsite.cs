@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 using System.Collections.Generic;
+using System.Linq;
 using System.Data;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -36,6 +37,30 @@ namespace firstproject.Models.DatabaseLayer
     {
         //private readonly object _config;
         //========================== MicroSite =================================== 
+        private static List<string> ReadProductImageList(NpgsqlDataReader reader)
+        {
+            var images = new List<string>();
+            try
+            {
+                if (reader["image"] != DBNull.Value && !string.IsNullOrWhiteSpace(reader["image"]?.ToString()))
+                    images.Add(reader["image"]!.ToString()!);
+
+                if (reader["imagegallery"] != DBNull.Value)
+                {
+                    var gallery = reader["imagegallery"];
+                    if (gallery is string[] arr)
+                        images.AddRange(arr.Where(x => !string.IsNullOrWhiteSpace(x)));
+                    else if (gallery is string s && !string.IsNullOrWhiteSpace(s))
+                        images.Add(s);
+                }
+            }
+            catch
+            {
+                // ignore invalid gallery format
+            }
+            return images;
+        }
+
         private async Task EnsureAssignProductSchema()
         {
             using var conn = new NpgsqlConnection(DbConnection);
@@ -1158,17 +1183,7 @@ ORDER BY ap.id DESC
                         BrandName = reader["brand_name"]?.ToString(),
                         CategoryName = reader["category_name"]?.ToString(),
 
-                        // ✅ Image + gallery merged for frontend display
-                        Images = new List<string>()
-                            .Concat(
-                                reader["image"] != DBNull.Value && !string.IsNullOrWhiteSpace(reader["image"]?.ToString())
-                                    ? new List<string> { reader["image"]?.ToString() ?? "" }
-                                    : new List<string>())
-                            .Concat(
-                                reader["imagegallery"] != DBNull.Value
-                                    ? ((string[])reader["imagegallery"]).ToList()
-                                    : new List<string>())
-                            .ToList()
+                        Images = ReadProductImageList(reader)
                     }
                 });
             }

@@ -155,11 +155,7 @@ ORDER BY ap.id DESC;";
             using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
             {
-                var images = new List<string>();
-                if (reader["image"] != DBNull.Value && !string.IsNullOrWhiteSpace(reader["image"]?.ToString()))
-                    images.Add(reader["image"]?.ToString() ?? "");
-                if (reader["imagegallery"] != DBNull.Value)
-                    images.AddRange((string[])reader["imagegallery"]);
+                var images = ReadProductImageList(reader);
 
                 list.Add(new MicrositeAssignedProduct
                 {

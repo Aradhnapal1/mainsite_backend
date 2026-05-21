@@ -26,7 +26,8 @@ namespace firstproject.Controllers
             if (microsite == null)
                 return NotFound(new { status = false, message = "Microsite nahi mila." });
 
-            return Ok(new { status = true, data = microsite });
+            var products = await _businessLayer.GetMicrositeProductsByUniqueId(microsite_id);
+            return Ok(new { status = true, data = microsite, products });
         }
 
         [HttpGet("home")]
@@ -49,6 +50,16 @@ namespace firstproject.Controllers
                     products
                 }
             });
+        }
+
+        [HttpGet("products-by-id")]
+        public async Task<IActionResult> GetProductsByMicrositeId([FromQuery] string microsite_id)
+        {
+            if (string.IsNullOrWhiteSpace(microsite_id))
+                return BadRequest(new { status = false, message = "microsite_id required hai." });
+
+            var products = await _businessLayer.GetMicrositeProductsByUniqueId(microsite_id);
+            return Ok(new { status = true, data = products });
         }
 
         [HttpGet("products")]
