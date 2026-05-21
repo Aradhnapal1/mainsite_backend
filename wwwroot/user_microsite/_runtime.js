@@ -87,7 +87,9 @@
     function extractProducts(payload) {
         if (!payload) return [];
         if (Array.isArray(payload.products)) return payload.products;
+        if (Array.isArray(payload.assignedProducts)) return payload.assignedProducts;
         if (payload.data && Array.isArray(payload.data.assignedProducts)) return payload.data.assignedProducts;
+        if (payload.data && Array.isArray(payload.data.products)) return payload.data.products;
         if (Array.isArray(payload.data) && payload.data.length && payload.data[0].productId) return payload.data;
         return [];
     }
@@ -208,10 +210,141 @@
         return p.price ?? p.Price ?? 0;
     }
 
-    function getProductImage(p) {
-        if (Array.isArray(p.images) && p.images.length > 0) return resolveAssetUrl(p.images[0]);
-        if (Array.isArray(p.Images) && p.Images.length > 0) return resolveAssetUrl(p.Images[0]);
-        return "";
+    function getProductImages(p) {
+        var raw = p.images || p.Images || [];
+        return raw.map(function (img) {
+            return resolveAssetUrl(img);
+        }).filter(Boolean);
+    }
+
+    function getIndexPage() {
+        return (window.location.pathname || "").toLowerCase().indexOf(".php") >= 0
+            ? "index.php"
+            : "index.html";
+    }
+
+    function escapeHtml(text) {
+        return String(text || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+    }
+
+    function getMainsiteProductCardHTML(p, wrapperClass) {
+        var id = p.productId || p.ProductId || p.id || p.Id;
+        var name = getProductName(p);
+        var category = p.categoryName || p.CategoryName || p.brandName || p.BrandName || "Product";
+        var images = getProductImages(p);
+        var mainImg = images[0] || "https://via.placeholder.com/400x400?text=Product";
+        var hoverImg = images[1] || "";
+        var displayPrice = getProductPrice(p);
+        var originalPrice = Number(p.price ?? p.Price ?? 0);
+        var productUrl =
+            window.MicrositeApp && window.MicrositeApp.getProductDetailUrl
+                ? window.MicrositeApp.getProductDetailUrl(id)
+                : "product" + (getIndexPage().indexOf(".php") >= 0 ? ".php" : ".html") +
+                  (window.MICROSITE_CONTEXT && window.MICROSITE_CONTEXT.micrositeId
+                      ? "?microsite_id=" + encodeURIComponent(window.MICROSITE_CONTEXT.micrositeId) + "&id=" + id
+                      : "?id=" + id);
+        var query = window.MICROSITE_CONTEXT && window.MICROSITE_CONTEXT.micrositeId
+            ? "?microsite_id=" + encodeURIComponent(window.MICROSITE_CONTEXT.micrositeId)
+            : "";
+        var indexPage = getIndexPage();
+
+        var hoverHtml = hoverImg
+            ? '<img src="' + hoverImg + '" alt="' + escapeHtml(name) + '" class="product-image-hover grid-product-image-hover">'
+            : "";
+
+        var priceHtml = "₹" + displayPrice;
+        if (originalPrice > displayPrice) {
+            priceHtml =
+                '<span class="new-price">₹' + displayPrice + '</span><span class="old-price">₹' + originalPrice + "</span>";
+        }
+
+        var thumbHtml = "";
+        images.slice(0, 4).forEach(function (img, i) {
+            var nextHover = images[i + 1] || img;
+            thumbHtml +=
+                '<a href="#" class="grid-color-swatch ' +
+                (i === 0 ? "active" : "") +
+                '" data-img="' +
+                img +
+                '" data-hover-img="' +
+                nextHover +
+                '" data-price="' +
+                displayPrice +
+                '" data-name="' +
+                escapeHtml(name) +
+                '"><span style="background:#e5e5e5"></span></a>';
+        });
+
+        var innerHTML =
+            '<div class="product product-7 text-center">' +
+            '<figure class="product-media">' +
+            '<a href="' +
+            productUrl +
+            '">' +
+            '<img src="' +
+            mainImg +
+            '" alt="' +
+            escapeHtml(name) +
+            '" class="product-image grid-product-image">' +
+            hoverHtml +
+            "</a>" +
+            '<div class="product-action-vertical">' +
+            '<a href="#" class="btn-product-icon btn-wishlist btn-expandable"><span>add to wishlist</span></a>' +
+            '<a href="#" class="btn-product-icon btn-quickview" title="Quick view"><span>Quick view</span></a>' +
+            "</div>" +
+            '<div class="product-action">' +
+            '<a href="#" class="btn-product btn-cart" data-id="' +
+            id +
+            '"><span>add to cart</span></a>' +
+            "</div>" +
+            "</figure>" +
+            '<div class="product-body">' +
+            '<div class="product-cat"><a href="#">' +
+            escapeHtml(category) +
+            "</a></div>" +
+            '<h3 class="product-title"><a href="' +
+            productUrl +
+            '" class="grid-product-title">' +
+            escapeHtml(name) +
+            "</a></h3>" +
+            '<div class="product-price grid-product-price">' +
+            priceHtml +
+            "</div>" +
+            (thumbHtml ? '<div class="product-nav product-nav-thumbs mt-1">' + thumbHtml + "</div>" : "") +
+            "</div></div>";
+
+        return wrapperClass ? '<div class="' + wrapperClass + '">' + innerHTML + "</div>" : innerHTML;
+    }
+
+    function bindProductCardEvents(root) {
+        if (!root) return;
+        root.querySelectorAll(".grid-color-swatch").forEach(function (swatch) {
+            swatch.addEventListener("click", function (e) {
+                e.preventDefault();
+                var card = swatch.closest(".product");
+                if (!card) return;
+                var img = swatch.getAttribute("data-img");
+                var hover = swatch.getAttribute("data-hover-img");
+                var price = swatch.getAttribute("data-price");
+                var name = swatch.getAttribute("data-name");
+                card.querySelectorAll(".grid-color-swatch").forEach(function (s) {
+                    s.classList.remove("active");
+                });
+                swatch.classList.add("active");
+                var main = card.querySelector(".grid-product-image");
+                var hoverEl = card.querySelector(".grid-product-image-hover");
+                if (main && img) main.src = img;
+                if (hoverEl && hover) hoverEl.src = hover;
+                var priceEl = card.querySelector(".grid-product-price");
+                if (priceEl && price) priceEl.innerHTML = "₹" + price;
+                var titleEl = card.querySelector(".grid-product-title");
+                if (titleEl && name) titleEl.textContent = name;
+            });
+        });
     }
 
     function renderProducts(products) {
@@ -234,26 +367,18 @@
         if (emptyEl) emptyEl.style.display = "none";
         if (sectionEl) sectionEl.style.display = "block";
 
-        products.forEach(function (p) {
-            var name = getProductName(p);
-            var price = getProductPrice(p);
-            var img = getProductImage(p);
-            var desc = p.description || p.Description || "";
+        var colClass =
+            products.length === 1
+                ? "col-12 col-sm-8 col-md-6 col-lg-4"
+                : products.length === 2
+                  ? "col-6 col-md-5 col-lg-4"
+                  : "col-6 col-md-4 col-lg-3 col-xl";
 
-            var card = document.createElement("div");
-            card.className = "col-md-4 col-sm-6";
-            card.innerHTML =
-                '<div class="card h-100 shadow-sm">' +
-                (img
-                    ? '<img src="' + img + '" class="card-img-top" alt="' + name.replace(/"/g, "") + '" style="height:200px;object-fit:cover;">'
-                    : "") +
-                '<div class="card-body d-flex flex-column">' +
-                '<h5 class="card-title">' + name + "</h5>" +
-                (desc ? '<p class="card-text text-muted small flex-grow-1">' + desc.substring(0, 120) + "...</p>" : "") +
-                '<p class="card-text fw-semibold mb-0">₹' + price + "</p>" +
-                "</div></div>";
-            container.appendChild(card);
+        products.forEach(function (p) {
+            container.insertAdjacentHTML("beforeend", getMainsiteProductCardHTML(p, colClass));
         });
+
+        bindProductCardEvents(container);
     }
 
     function preserveContextLinks(context) {
@@ -265,7 +390,7 @@
         if (!query) return;
 
         document.querySelectorAll(".ms-header-nav a, .ms-nav-home").forEach(function (link) {
-            var href = link.getAttribute("href") || "index.html";
+            var href = link.getAttribute("href") || getIndexPage();
             var clean = href.split("?")[0];
             link.setAttribute("href", clean + "?" + query);
         });
@@ -295,5 +420,9 @@
 
         bindMicrosite(bundle.microsite);
         renderProducts(bundle.products);
+
+        if (window.MicrositeApp && window.MicrositeApp.updateCartBadge) {
+            window.MicrositeApp.updateCartBadge();
+        }
     });
 })();

@@ -72,6 +72,21 @@ namespace firstproject.Controllers
             return Ok(new { status = true, data = products });
         }
 
+        [HttpGet("product-by-id")]
+        public async Task<IActionResult> GetProductById([FromQuery] string microsite_id, [FromQuery] int product_id)
+        {
+            if (string.IsNullOrWhiteSpace(microsite_id))
+                return BadRequest(new { status = false, message = "microsite_id required hai." });
+            if (product_id <= 0)
+                return BadRequest(new { status = false, message = "product_id required hai." });
+
+            var product = await _businessLayer.GetMicrositeProductByUniqueId(microsite_id, product_id);
+            if (product == null)
+                return NotFound(new { status = false, message = "Product nahi mila ya microsite par assign nahi hai." });
+
+            return Ok(new { status = true, data = product });
+        }
+
         [HttpPost("auth/send-otp")]
         public async Task<IActionResult> SendOtp([FromBody] MicrositeOtpSendRequest request)
         {
