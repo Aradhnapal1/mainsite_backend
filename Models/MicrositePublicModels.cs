@@ -19,6 +19,7 @@ namespace firstproject.Models
 
     public class MicrositeSingleOrderRequest
     {
+        public string? MicrositeId { get; set; }
         public string Domain { get; set; } = "";
         public int ProductId { get; set; }
         public int Quantity { get; set; } = 1;

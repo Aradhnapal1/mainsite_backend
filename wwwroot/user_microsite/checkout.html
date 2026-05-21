@@ -36,18 +36,19 @@
 <main class="container pb-5">
     <section class="card p-4 shadow-sm">
         <h2 class="mb-3">Checkout</h2>
+        <p id="msCheckoutHint" class="text-muted small">Sirf 1 product ka order place ho sakta hai.</p>
         <form id="msCheckoutForm">
             <div class="row g-3">
-                <div class="col-md-6"><input class="form-control" name="firstName" type="text" placeholder="First Name" required></div>
-                <div class="col-md-6"><input class="form-control" name="lastName" type="text" placeholder="Last Name" required></div>
-                <div class="col-md-6"><input class="form-control" name="email" type="email" placeholder="Email" required></div>
-                <div class="col-md-6"><input class="form-control" name="mobile" type="text" placeholder="Mobile" required></div>
+                <div class="col-12 col-md-6"><input class="form-control" name="firstName" type="text" placeholder="First Name" required></div>
+                <div class="col-12 col-md-6"><input class="form-control" name="lastName" type="text" placeholder="Last Name"></div>
+                <div class="col-12 col-md-6"><input class="form-control" name="email" type="email" placeholder="Email" required></div>
+                <div class="col-12 col-md-6"><input class="form-control" name="mobile" type="text" placeholder="Mobile" required></div>
                 <div class="col-12"><textarea class="form-control" name="address" rows="3" placeholder="Address" required></textarea></div>
-                <div class="col-md-4"><input class="form-control" name="city" type="text" placeholder="City"></div>
-                <div class="col-md-4"><input class="form-control" name="state" type="text" placeholder="State"></div>
-                <div class="col-md-4"><input class="form-control" name="pincode" type="text" placeholder="Pincode"></div>
+                <div class="col-12 col-md-4"><input class="form-control" name="city" type="text" placeholder="City"></div>
+                <div class="col-12 col-md-4"><input class="form-control" name="state" type="text" placeholder="State"></div>
+                <div class="col-12 col-md-4"><input class="form-control" name="pincode" type="text" placeholder="Pincode"></div>
             </div>
-            <button type="button" class="btn ms-btn mt-3" id="msPlaceOrderBtn">Place Order</button>
+            <button type="button" class="btn ms-btn mt-3 w-100 w-md-auto" id="msPlaceOrderBtn">Place Order (1 Product)</button>
         </form>
     </section>
 </main>

@@ -108,13 +108,32 @@
         return [];
     }
 
+    function getApiBase() {
+        var base = window.MICROSITE_API_BASE || window.location.origin || "";
+        return String(base).replace(/\/$/, "");
+    }
+
+    function pickField(obj) {
+        for (var i = 1; i < arguments.length; i++) {
+            var key = arguments[i];
+            if (obj && obj[key] !== undefined && obj[key] !== null && obj[key] !== "") {
+                return obj[key];
+            }
+        }
+        return "";
+    }
+
     function resolveAssetUrl(path) {
         if (!path) return "";
         var cleanPath = String(path).trim().replace(/\\/g, "/");
         if (!cleanPath) return "";
         if (/^https?:\/\//i.test(cleanPath) || cleanPath.startsWith("data:")) return cleanPath;
-        if (cleanPath.startsWith("/")) return API_BASE + cleanPath;
-        return API_BASE + "/" + cleanPath;
+
+        var base = getApiBase();
+        if (cleanPath.startsWith(base)) return cleanPath;
+
+        if (cleanPath.startsWith("/")) return base + cleanPath;
+        return base + "/" + cleanPath.replace(/^\//, "");
     }
 
     async function fetchMicrositeBundle(context) {
@@ -203,8 +222,14 @@
         setText("msContactMobile", m.mobile, "-");
         setText("msDateRange", buildDateRange(m.startDate, m.endDate), "Validity: -");
 
-        var logoUrl = resolveAssetUrl(m.logoImage);
-        var bannerUrl = resolveAssetUrl(m.bannerImage);
+        var logoUrl = resolveAssetUrl(
+            pickField(m, "logoImage", "LogoImage", "logo_image")
+        );
+        var bannerUrl = resolveAssetUrl(
+            pickField(m, "bannerImage", "BannerImage", "banner_image")
+        );
+        var faviconUrl = resolveAssetUrl(pickField(m, "favicon", "Favicon"));
+
         if (logoUrl) setImage("msLogo", logoUrl);
         if (bannerUrl) {
             setImage("msBanner", bannerUrl);
@@ -212,20 +237,49 @@
             if (bannerEl) bannerEl.style.display = "";
         }
 
-        applyTheme(m.theme || {});
-        applySeo(m.seo || {}, name, m.favicon);
+        applyTheme(m.theme || m.Theme || {});
+        applySeo(m.seo || m.Seo || {}, name, faviconUrl);
+
+        if (window.MICROSITE_CONTEXT) {
+            var domains = m.domains || m.Domains || [];
+            if (domains.length && !window.MICROSITE_CONTEXT.domain) {
+                window.MICROSITE_CONTEXT.domain = domains[0];
+            }
+        }
     }
 
     function getProductName(p) {
         return p.productName || p.ProductName || p.name || p.Name || "Product";
     }
 
-    function getProductPrice(p) {
-        var discount = p.discountPrice ?? p.DiscountPrice;
-        if (discount !== null && discount !== undefined && Number(discount) > 0) {
-            return discount;
+    function formatMoney(amount) {
+        var n = Number(amount);
+        if (isNaN(n)) return "0";
+        return n % 1 === 0 ? String(n) : n.toFixed(2);
+    }
+
+    function getProductPrices(p) {
+        var price = Number(p.price ?? p.Price ?? 0);
+        var discountPrice = Number(p.discountPrice ?? p.DiscountPrice ?? 0);
+        var salePrice = discountPrice > 0 ? discountPrice : price;
+        return { price: price, discountPrice: discountPrice, salePrice: salePrice };
+    }
+
+    function getProductPriceHtml(p) {
+        var prices = getProductPrices(p);
+        if (prices.price > 0 && prices.discountPrice > 0) {
+            return (
+                '<span class="new-price">₹' +
+                formatMoney(prices.discountPrice) +
+                '</span><span class="old-price">₹' +
+                formatMoney(prices.price) +
+                "</span>"
+            );
         }
-        return p.price ?? p.Price ?? 0;
+        if (prices.discountPrice > 0) {
+            return '<span class="new-price">₹' + formatMoney(prices.discountPrice) + "</span>";
+        }
+        return '<span class="new-price">₹' + formatMoney(prices.price) + "</span>";
     }
 
     function getProductImages(p) {
@@ -256,8 +310,8 @@
         var images = getProductImages(p);
         var mainImg = images[0] || "https://via.placeholder.com/400x400?text=Product";
         var hoverImg = images[1] || "";
-        var displayPrice = getProductPrice(p);
-        var originalPrice = Number(p.price ?? p.Price ?? 0);
+        var prices = getProductPrices(p);
+        var priceHtml = getProductPriceHtml(p);
         var productUrl =
             window.MicrositeApp && window.MicrositeApp.getProductDetailUrl
                 ? window.MicrositeApp.getProductDetailUrl(id)
@@ -274,12 +328,6 @@
             ? '<img src="' + hoverImg + '" alt="' + escapeHtml(name) + '" class="product-image-hover grid-product-image-hover">'
             : "";
 
-        var priceHtml = "₹" + displayPrice;
-        if (originalPrice > displayPrice) {
-            priceHtml =
-                '<span class="new-price">₹' + displayPrice + '</span><span class="old-price">₹' + originalPrice + "</span>";
-        }
-
         var thumbHtml = "";
         images.slice(0, 4).forEach(function (img, i) {
             var nextHover = images[i + 1] || img;
@@ -290,8 +338,8 @@
                 img +
                 '" data-hover-img="' +
                 nextHover +
-                '" data-price="' +
-                displayPrice +
+                '" data-price-html="' +
+                escapeHtml(priceHtml) +
                 '" data-name="' +
                 escapeHtml(name) +
                 '"><span style="background:#e5e5e5"></span></a>';
@@ -335,7 +383,7 @@
             (thumbHtml ? '<div class="product-nav product-nav-thumbs mt-1">' + thumbHtml + "</div>" : "") +
             "</div></div>";
 
-        return wrapperClass ? '<div class="' + wrapperClass + '">' + innerHTML + "</div>" : innerHTML;
+        return '<div class="ms-product-slide">' + innerHTML + "</div>";
     }
 
     function bindProductCardEvents(root) {
@@ -347,7 +395,7 @@
                 if (!card) return;
                 var img = swatch.getAttribute("data-img");
                 var hover = swatch.getAttribute("data-hover-img");
-                var price = swatch.getAttribute("data-price");
+                var priceHtmlAttr = swatch.getAttribute("data-price-html");
                 var name = swatch.getAttribute("data-name");
                 card.querySelectorAll(".grid-color-swatch").forEach(function (s) {
                     s.classList.remove("active");
@@ -358,7 +406,7 @@
                 if (main && img) main.src = img;
                 if (hoverEl && hover) hoverEl.src = hover;
                 var priceEl = card.querySelector(".grid-product-price");
-                if (priceEl && price) priceEl.innerHTML = "₹" + price;
+                if (priceEl && priceHtmlAttr) priceEl.innerHTML = priceHtmlAttr;
                 var titleEl = card.querySelector(".grid-product-title");
                 if (titleEl && name) titleEl.textContent = name;
             });
@@ -385,18 +433,109 @@
         if (emptyEl) emptyEl.style.display = "none";
         if (sectionEl) sectionEl.style.display = "block";
 
-        var colClass =
-            products.length === 1
-                ? "col-12 col-sm-8 col-md-6 col-lg-4"
-                : products.length === 2
-                  ? "col-6 col-md-5 col-lg-4"
-                  : "col-6 col-md-4 col-lg-3 col-xl";
+        container.className = "ms-products-track";
+        container.style.transform = "";
 
         products.forEach(function (p) {
-            container.insertAdjacentHTML("beforeend", getMainsiteProductCardHTML(p, colClass));
+            container.insertAdjacentHTML("beforeend", getMainsiteProductCardHTML(p));
         });
 
         bindProductCardEvents(container);
+        initProductCarousel(products.length);
+    }
+
+    function getItemsPerPage() {
+        var w = window.innerWidth || 1200;
+        if (w < 576) return 1;
+        if (w < 768) return 2;
+        if (w < 992) return 3;
+        if (w < 1200) return 4;
+        return 5;
+    }
+
+    function initProductCarousel(totalProducts) {
+        var track = document.getElementById("msProducts");
+        var viewport = track ? track.parentElement : null;
+        var prevBtn = document.getElementById("msCarouselPrev");
+        var nextBtn = document.getElementById("msCarouselNext");
+        var dotsWrap = document.getElementById("msCarouselDots");
+        if (!track || !viewport) return;
+
+        var state = { page: 0, perPage: getItemsPerPage(), total: totalProducts };
+
+        function totalPages() {
+            return Math.max(1, Math.ceil(state.total / state.perPage));
+        }
+
+        function updateLayout() {
+            state.perPage = getItemsPerPage();
+            var pages = totalPages();
+            if (state.page >= pages) state.page = pages - 1;
+
+            var slideBasis = 100 / state.perPage;
+            track.querySelectorAll(".ms-product-slide").forEach(function (slide) {
+                slide.style.flex = "0 0 " + slideBasis + "%";
+                slide.style.maxWidth = slideBasis + "%";
+            });
+
+            var offset = state.page * 100;
+            track.style.transform = "translate3d(-" + offset + "%, 0, 0)";
+
+            if (prevBtn) prevBtn.disabled = state.page <= 0;
+            if (nextBtn) nextBtn.disabled = state.page >= pages - 1;
+
+            if (dotsWrap) {
+                dotsWrap.innerHTML = "";
+                if (pages > 1) {
+                    for (var i = 0; i < pages; i++) {
+                        var dot = document.createElement("button");
+                        dot.type = "button";
+                        dot.className = "ms-carousel-dot" + (i === state.page ? " active" : "");
+                        dot.setAttribute("aria-label", "Page " + (i + 1));
+                        dot.addEventListener(
+                            "click",
+                            (function (idx) {
+                                return function () {
+                                    state.page = idx;
+                                    updateLayout();
+                                };
+                            })(i)
+                        );
+                        dotsWrap.appendChild(dot);
+                    }
+                    dotsWrap.style.display = "flex";
+                } else {
+                    dotsWrap.style.display = "none";
+                }
+            }
+
+            var showNav = state.total > state.perPage;
+            if (prevBtn) prevBtn.style.display = showNav ? "" : "none";
+            if (nextBtn) nextBtn.style.display = showNav ? "" : "none";
+        }
+
+        if (prevBtn) {
+            prevBtn.onclick = function () {
+                if (state.page > 0) {
+                    state.page -= 1;
+                    updateLayout();
+                }
+            };
+        }
+        if (nextBtn) {
+            nextBtn.onclick = function () {
+                if (state.page < totalPages() - 1) {
+                    state.page += 1;
+                    updateLayout();
+                }
+            };
+        }
+
+        window.addEventListener("resize", function () {
+            updateLayout();
+        });
+
+        updateLayout();
     }
 
     function preserveContextLinks(context) {

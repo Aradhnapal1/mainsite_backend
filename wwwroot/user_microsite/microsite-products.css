@@ -1,20 +1,142 @@
 /* Mainsite-style featured product cards for microsite */
 .ms-featured-wrap {
     background-color: #f8f8f8;
-    padding: 4rem 0;
-    margin: 0 -12px 2rem;
-    padding-left: 12px;
-    padding-right: 12px;
+    padding: 2rem 0 3rem;
+    margin: 0 0 2rem;
+}
+
+.ms-carousel-shell {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.ms-products-viewport {
+    flex: 1;
+    overflow: hidden;
+    width: 100%;
+}
+
+.ms-products-track {
+    display: flex;
+    flex-wrap: nowrap;
+    transition: transform 0.45s ease;
+    will-change: transform;
+}
+
+.ms-product-slide {
+    padding: 0 10px;
+    box-sizing: border-box;
+    flex: 0 0 20%;
+    max-width: 20%;
+}
+
+.ms-carousel-btn {
+    flex: 0 0 auto;
+    width: 42px;
+    height: 42px;
+    border: none;
+    border-radius: 50%;
+    background: #fff;
+    color: #999;
+    font-size: 2rem;
+    line-height: 1;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+    cursor: pointer;
+    z-index: 2;
+}
+
+.ms-carousel-btn:hover:not(:disabled) {
+    color: #333;
+    background: #fff;
+}
+
+.ms-carousel-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.ms-carousel-dots {
+    display: none;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+}
+
+.ms-carousel-dot {
+    width: 8px;
+    height: 8px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: #d1d5db;
+    cursor: pointer;
+}
+
+.ms-carousel-dot.active {
+    background: #333;
+    transform: scale(1.15);
+}
+
+.ms-product-slide > .product {
+    width: 100%;
+    height: 100%;
 }
 
 .ms-featured-wrap .heading .title {
-    font-size: 2.4rem;
+    font-size: clamp(1.25rem, 4vw, 2.4rem);
     font-weight: 400;
     letter-spacing: 0.05em;
     text-transform: uppercase;
     color: #333;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
     text-align: center;
+}
+
+@media (max-width: 1199.98px) {
+    .ms-product-slide {
+        flex: 0 0 25%;
+        max-width: 25%;
+    }
+}
+
+@media (max-width: 991.98px) {
+    .ms-product-slide {
+        flex: 0 0 33.3333%;
+        max-width: 33.3333%;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .ms-product-slide {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+    .ms-carousel-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 1.6rem;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .ms-featured-wrap {
+        padding: 1.25rem 0 2rem;
+    }
+    .ms-product-slide {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+    .ms-featured-wrap .product-action,
+    .ms-featured-wrap .product-action-vertical {
+        opacity: 1;
+        visibility: visible;
+    }
+    .ms-featured-wrap .product-image,
+    .ms-featured-wrap .product-image-hover {
+        max-height: 220px;
+    }
 }
 
 .ms-featured-wrap .product {

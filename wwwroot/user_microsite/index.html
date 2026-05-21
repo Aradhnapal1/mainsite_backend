@@ -50,11 +50,20 @@
         <p id="msContent" class="mb-0">Loading microsite...</p>
     </section>
     <div class="ms-featured-wrap" id="msProductsSection">
-        <div class="heading heading-center mb-3">
-            <h2 class="title">FEATURED PRODUCTS</h2>
+        <div class="container-fluid px-3 px-lg-4">
+            <div class="heading heading-center mb-3">
+                <h2 class="title">FEATURED PRODUCTS</h2>
+            </div>
+            <div class="ms-carousel-shell">
+                <button type="button" class="ms-carousel-btn ms-carousel-prev" id="msCarouselPrev" aria-label="Previous products"><span>‹</span></button>
+                <div class="ms-products-viewport">
+                    <div id="msProducts" class="ms-products-track"></div>
+                </div>
+                <button type="button" class="ms-carousel-btn ms-carousel-next" id="msCarouselNext" aria-label="Next products"><span>›</span></button>
+            </div>
+            <div class="ms-carousel-dots" id="msCarouselDots"></div>
+            <p id="msProductsEmpty" class="ms-products-empty" style="display:none;">This microsite do not have products.</p>
         </div>
-        <div id="msProducts" class="row justify-content-center"></div>
-        <p id="msProductsEmpty" class="ms-products-empty" style="display:none;">This microsite do not have products.</p>
     </div>
 </main>
 <footer class="ms-footer py-4 mt-4">

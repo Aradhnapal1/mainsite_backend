@@ -155,8 +155,8 @@ namespace firstproject.Models.BusinessLayer
         public async Task<IActionResult> PlaceMicrositeOrder(string token, MicrositeSingleOrderRequest request)
         {
             await _databaseLayer.EnsureMicrositePublicSchema();
-            if (string.IsNullOrWhiteSpace(request.Domain))
-                return new BadRequestObjectResult(new { status = false, message = "Domain required hai." });
+            if (string.IsNullOrWhiteSpace(request.MicrositeId) && string.IsNullOrWhiteSpace(request.Domain))
+                return new BadRequestObjectResult(new { status = false, message = "microsite_id ya domain required hai." });
             if (request.ProductId <= 0)
                 return new BadRequestObjectResult(new { status = false, message = "Product required hai." });
             if (request.Quantity != 1)
@@ -167,7 +167,7 @@ namespace firstproject.Models.BusinessLayer
             if (userId == null)
                 return new UnauthorizedObjectResult(new { status = false, message = "Invalid token." });
 
-            var microsite = await _databaseLayer.ResolveMicrositeByDomain(request.Domain);
+            var microsite = await ResolveMicrositeForPublic(request.MicrositeId, request.Domain);
             if (microsite == null)
                 return new NotFoundObjectResult(new { status = false, message = "Microsite domain invalid hai." });
 

@@ -33,13 +33,21 @@
         return q ? "?" + q : "";
     }
 
+    function getApiBase() {
+        var base = window.MICROSITE_API_BASE || window.location.origin || "";
+        return String(base).replace(/\/$/, "");
+    }
+
     function resolveAssetUrl(path) {
         if (!path) return "";
         var cleanPath = String(path).trim().replace(/\\/g, "/");
         if (!cleanPath) return "";
         if (/^https?:\/\//i.test(cleanPath) || cleanPath.startsWith("data:")) return cleanPath;
-        if (cleanPath.startsWith("/")) return API_BASE + cleanPath;
-        return API_BASE + "/" + cleanPath;
+
+        var base = getApiBase();
+        if (cleanPath.startsWith(base)) return cleanPath;
+        if (cleanPath.startsWith("/")) return base + cleanPath;
+        return base + "/" + cleanPath.replace(/^\//, "");
     }
 
     function cartKey() {
@@ -66,9 +74,18 @@
     }
 
     function getCartCount() {
-        return getCart().reduce(function (sum, item) {
-            return sum + (Number(item.qty) || 1);
-        }, 0);
+        var items = getCart();
+        return items.length > 0 ? 1 : 0;
+    }
+
+    function canAddToCart(productId) {
+        var items = getCart();
+        if (!items.length) return { ok: true };
+        var existing = items[0];
+        if (String(existing.id) === String(productId)) {
+            return { ok: false, message: "Ye product pehle se cart me hai. Sirf 1 product allow hai." };
+        }
+        return { ok: false, message: "Microsite me sirf 1 product cart me ho sakta hai. Pehle remove karein." };
     }
 
     function updateCartBadge() {
@@ -141,26 +158,29 @@
     function addToCart(product, qty) {
         var id = product.id || product.productId;
         if (!id) return;
-        var items = getCart();
-        var quantity = Math.max(1, Number(qty) || 1);
-        var existing = items.find(function (x) {
-            return String(x.id) === String(id);
-        });
+
+        var check = canAddToCart(id);
+        if (!check.ok) {
+            if (window.iziToast) {
+                iziToast.warning({ title: "Cart", message: check.message, position: "topRight" });
+            }
+            return;
+        }
+
         var entry = {
             id: id,
             name: product.name || product.productName || "Product",
             price: Number(product.price ?? product.discountPrice ?? product.Price ?? 0),
             image: (product.images && product.images[0]) || product.image || "",
-            qty: quantity,
+            qty: 1,
         };
-        if (existing) {
-            existing.qty = (Number(existing.qty) || 0) + quantity;
-        } else {
-            items.push(entry);
-        }
-        saveCart(items);
+        saveCart([entry]);
         if (window.iziToast) {
-            iziToast.success({ title: "Cart", message: "Product cart me add ho gaya.", position: "topRight" });
+            iziToast.success({
+                title: "Cart",
+                message: "Product cart me add ho gaya (max 1 product).",
+                position: "topRight",
+            });
         }
     }
 
@@ -315,14 +335,20 @@
             img.style.display = "";
         }
 
-        var priceHtml = "₹" + norm.price;
-        if (norm.originalPrice > norm.price) {
+        var mrp = Number(p.price ?? p.Price ?? 0);
+        var discount = Number(p.discountPrice ?? p.DiscountPrice ?? 0);
+        var priceHtml = "";
+        if (mrp > 0 && discount > 0) {
             priceHtml =
                 '<span class="new-price">₹' +
-                norm.price +
-                '</span> <span class="old-price text-muted"><del>₹' +
-                norm.originalPrice +
-                "</del></span>";
+                discount +
+                '</span><span class="old-price">₹' +
+                mrp +
+                "</span>";
+        } else if (discount > 0) {
+            priceHtml = '<span class="new-price">₹' + discount + "</span>";
+        } else {
+            priceHtml = '<span class="new-price">₹' + mrp + "</span>";
         }
         if (price) price.innerHTML = priceHtml;
 
@@ -364,23 +390,20 @@
         }
         if (empty) empty.style.display = "none";
 
-        var total = 0;
-        items.forEach(function (item) {
-            var line = (Number(item.price) || 0) * (Number(item.qty) || 1);
-            total += line;
-            var tr = document.createElement("tr");
-            tr.innerHTML =
-                "<td>" +
-                (item.name || "Product") +
-                "</td><td>" +
-                (item.qty || 1) +
-                "</td><td>₹" +
-                line.toFixed(2) +
-                '</td><td><button type="button" class="btn btn-sm btn-outline-danger ms-remove-cart" data-id="' +
-                item.id +
-                '">Remove</button></td>';
-            tbody.appendChild(tr);
-        });
+        var item = items[0];
+        item.qty = 1;
+        var line = Number(item.price) || 0;
+        var tr = document.createElement("tr");
+        tr.innerHTML =
+            "<td>" +
+            (item.name || "Product") +
+            "</td><td>1</td><td>₹" +
+            line.toFixed(2) +
+            '</td><td><button type="button" class="btn btn-sm btn-outline-danger ms-remove-cart" data-id="' +
+            item.id +
+            '">Remove</button></td>';
+        tbody.appendChild(tr);
+        var total = line;
         if (totalEl) totalEl.textContent = "₹" + total.toFixed(2);
 
         tbody.querySelectorAll(".ms-remove-cart").forEach(function (btn) {
@@ -388,6 +411,87 @@
                 removeFromCart(btn.getAttribute("data-id"));
                 renderCartTable();
             });
+        });
+    }
+
+    async function initCheckoutPage() {
+        var form = document.getElementById("msCheckoutForm");
+        var btn = document.getElementById("msPlaceOrderBtn");
+        var hint = document.getElementById("msCheckoutHint");
+        if (!form || !btn) return;
+
+        var cart = getCart();
+        if (!cart.length) {
+            if (hint) hint.textContent = "Cart empty hai. Pehle 1 product add karein.";
+            btn.disabled = true;
+            return;
+        }
+        if (cart.length > 1) {
+            saveCart([cart[0]]);
+            cart = getCart();
+        }
+        if (hint) {
+            hint.textContent = "Ordering: " + (cart[0].name || "Product") + " (qty 1 only)";
+        }
+
+        var auth = getAuth();
+        if (!auth || !auth.token) {
+            if (hint) hint.textContent = "Order ke liye pehle login karein.";
+            btn.disabled = true;
+            return;
+        }
+
+        btn.addEventListener("click", async function () {
+            var ctx = getContext();
+            var fd = new FormData(form);
+            var body = {
+                micrositeId: ctx.micrositeId || "",
+                domain: ctx.domain || "",
+                productId: Number(cart[0].id),
+                quantity: 1,
+                firstName: (fd.get("firstName") || "").toString().trim(),
+                lastName: (fd.get("lastName") || "").toString().trim(),
+                email: (fd.get("email") || auth.user?.email || "").toString().trim(),
+                mobile: (fd.get("mobile") || "").toString().trim(),
+                address: (fd.get("address") || "").toString().trim(),
+                city: (fd.get("city") || "").toString().trim(),
+                state: (fd.get("state") || "").toString().trim(),
+                pincode: (fd.get("pincode") || "").toString().trim(),
+                country: (fd.get("country") || "India").toString().trim(),
+            };
+
+            if (!body.firstName || !body.email || !body.address) {
+                iziToast.warning({ title: "Checkout", message: "Required fields fill karein.", position: "topRight" });
+                return;
+            }
+            if (!body.micrositeId && !body.domain) {
+                iziToast.warning({ title: "Checkout", message: "microsite_id URL me missing hai.", position: "topRight" });
+                return;
+            }
+
+            btn.disabled = true;
+            try {
+                var res = await fetch(API_BASE + "/api/microsite-public/order", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: "Bearer " + auth.token,
+                    },
+                    body: JSON.stringify(body),
+                });
+                var data = await res.json();
+                if (data.status) {
+                    saveCart([]);
+                    iziToast.success({ title: "Order", message: data.message || "Order placed.", position: "topRight" });
+                    window.location.href = "order" + getPageExt() + getContextQuery();
+                } else {
+                    iziToast.error({ title: "Order", message: data.message || "Order failed.", position: "topRight" });
+                }
+            } catch (e) {
+                iziToast.error({ title: "Order", message: "Server error.", position: "topRight" });
+            } finally {
+                btn.disabled = false;
+            }
         });
     }
 
@@ -413,6 +517,7 @@
         if (page === "register") initAuthForm("register");
         if (page === "product") initProductPage();
         if (page === "cart") renderCartTable();
+        if (page === "checkout") initCheckoutPage();
 
         document.body.addEventListener("click", function (e) {
             var btn = e.target.closest(".btn-cart[data-id]");
@@ -454,5 +559,7 @@
         getAuth: getAuth,
         saveAuth: saveAuth,
         clearAuth: clearAuth,
+        canAddToCart: canAddToCart,
+        getApiBase: getApiBase,
     };
 })();
