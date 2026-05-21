@@ -1,7 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Npgsql;
-using System.Net;
-using System.Net.Mail;
 
 namespace firstproject.Models.DatabaseLayer
 {
@@ -12,7 +10,8 @@ namespace firstproject.Models.DatabaseLayer
         Task<IActionResult> UpdateUser(int id, [FromForm] Usermodel model);
         Task<IActionResult> DeleteUser(int id);
         Task<Usermodel> GetUserByEmail(string email);
-        Task<IActionResult> ForgotPassword(string email);
+        Task EnsureUserPasswordResetSchema();
+        Task SaveUserPasswordResetOtp(int userId, string otp, DateTime expiresAtUtc);
     }
 
     public partial class DatabaseLayer : IDatabaseLayer
@@ -130,7 +129,7 @@ namespace firstproject.Models.DatabaseLayer
             {
                 await connection.OpenAsync();
                 using (var command = new NpgsqlCommand(
-                    "SELECT id, firstname, lastname, email, password, role, isactive, createdat FROM users WHERE email = @Email",
+                    "SELECT id, firstname, lastname, email, password, role, isactive, createdat FROM users WHERE LOWER(email) = LOWER(@Email)",
                     connection))
                 {
                     command.Parameters.AddWithValue("@Email", email ?? string.Empty);
@@ -165,84 +164,36 @@ namespace firstproject.Models.DatabaseLayer
 
 
 
-        public async Task<IActionResult> ForgotPassword(string email)
+        public async Task EnsureUserPasswordResetSchema()
         {
-            try
-            {
-                // Step 1 - Check email
-                if (string.IsNullOrEmpty(email))
-                {
-                    return new BadRequestObjectResult(new
-                    {
-                        status = false,
-                        message = "Email is required"
-                    });
-                }
+            using var connection = new NpgsqlConnection(DbConnection);
+            await connection.OpenAsync();
+            const string sql = @"
+CREATE TABLE IF NOT EXISTS user_password_reset (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    otp TEXT NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    is_used BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);";
+            using var cmd = new NpgsqlCommand(sql, connection);
+            await cmd.ExecuteNonQueryAsync();
+        }
 
-                // Step 2 - User fetch
-                var user = await GetUserByEmail(email);
-
-                if (user == null)
-                {
-                    return new NotFoundObjectResult(new
-                    {
-                        status = false,
-                        message = "User with this email not found"
-                    });
-                }
-
-                // Step 3 - Gmail credentials
-                var fromEmail = "aradhna9315@gmail.com";
-
-                // App password without spaces
-                var appPassword = "mrprvvjdjpbuuzyw";
-
-                // Step 4 - Mail message
-                MailMessage message = new MailMessage();
-
-                message.From = new MailAddress(fromEmail);
-
-                // User email
-                message.To.Add(email);
-
-                message.Subject = "Forgot Password";
-
-                // Test message
-                message.Body =
-                    $"Hello,\n\nYour forgot password email is working successfully.";
-
-                // Step 5 - SMTP
-                using (var smtp = new SmtpClient("smtp.gmail.com", 587))
-                {
-                    smtp.Credentials =
-                        new NetworkCredential(fromEmail, appPassword);
-
-                    smtp.EnableSsl = true;
-
-                    smtp.UseDefaultCredentials = false;
-
-                    smtp.DeliveryMethod = SmtpDeliveryMethod.Network;
-
-                    await smtp.SendMailAsync(message);
-                }
-
-                // Step 6 - Success response
-                return new OkObjectResult(new
-                {
-                    status = true,
-                    message = "Email sent successfully",
-                    sentTo = email
-                });
-            }
-            catch (Exception ex)
-            {
-                return new BadRequestObjectResult(new
-                {
-                    status = false,
-                    error = ex.Message,
-                    innerError = ex.InnerException?.Message
-                });
-            }
+        public async Task SaveUserPasswordResetOtp(int userId, string otp, DateTime expiresAtUtc)
+        {
+            await EnsureUserPasswordResetSchema();
+            using var connection = new NpgsqlConnection(DbConnection);
+            await connection.OpenAsync();
+            const string sql = @"
+INSERT INTO user_password_reset (user_id, otp, expires_at)
+VALUES (@userId, @otp, @expiresAt);";
+            using var cmd = new NpgsqlCommand(sql, connection);
+            cmd.Parameters.AddWithValue("@userId", userId);
+            cmd.Parameters.AddWithValue("@otp", otp);
+            cmd.Parameters.AddWithValue("@expiresAt", expiresAtUtc);
+            await cmd.ExecuteNonQueryAsync();
         }
 
 

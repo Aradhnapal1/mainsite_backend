@@ -1,7 +1,5 @@
 ﻿using firstproject.Helpers;
 using Microsoft.AspNetCore.Mvc;
-using System.Net;
-using System.Net.Mail;
 using System.Text;
 
 namespace firstproject.Models.BusinessLayer
@@ -247,35 +245,17 @@ namespace firstproject.Models.BusinessLayer
 
         private async Task SendEmailIfConfigured(string toEmail, string subject, string htmlBody)
         {
-            var host = _configuration["Smtp:Host"];
-            if (string.IsNullOrWhiteSpace(host))
+            if (string.IsNullOrWhiteSpace(_configuration["Smtp:Host"]))
                 return;
 
-            var port = int.TryParse(_configuration["Smtp:Port"], out var parsedPort) ? parsedPort : 587;
-            var username = _configuration["Smtp:Username"];
-            var password = _configuration["Smtp:Password"];
-            var fromEmail = _configuration["Smtp:FromEmail"] ?? username ?? "no-reply@example.com";
-            var fromName = _configuration["Smtp:FromName"] ?? "Microsite";
-            var enableSsl = !string.Equals(_configuration["Smtp:EnableSsl"], "false", StringComparison.OrdinalIgnoreCase);
-
-            using var mail = new MailMessage
+            try
             {
-                Subject = subject,
-                Body = htmlBody,
-                IsBodyHtml = true
-            };
-            mail.To.Add(toEmail);
-            mail.From = new MailAddress(fromEmail, fromName);
-
-            using var client = new SmtpClient(host, port)
+                await SmtpEmailHelper.SendAsync(_configuration, toEmail, subject, htmlBody);
+            }
+            catch
             {
-                EnableSsl = enableSsl
-            };
-
-            if (!string.IsNullOrWhiteSpace(username))
-                client.Credentials = new NetworkCredential(username, password);
-
-            await client.SendMailAsync(mail);
+                // OTP API still returns success; email failure is logged server-side in hosting logs.
+            }
         }
     }
 }

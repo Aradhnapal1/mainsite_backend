@@ -145,9 +145,10 @@ namespace firstproject.Controllers
 
 
         [HttpPost("forgotpassword")]
-        public async Task<IActionResult> ForgotPassword([FromForm] string email)
+        public async Task<IActionResult> ForgotPassword([FromForm] string? email, [FromBody] ForgotPasswordRequest? body)
         {
-            var result = await _businessLayer.ForgotPassword(email);
+            var resolvedEmail = !string.IsNullOrWhiteSpace(email) ? email : body?.Email;
+            var result = await _businessLayer.ForgotPassword(resolvedEmail ?? "");
             return result;
         }
     }

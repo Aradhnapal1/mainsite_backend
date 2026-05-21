@@ -144,6 +144,11 @@ namespace firstproject.Models
         public string? Password { get; set; }
     }
 
+    public class ForgotPasswordRequest
+    {
+        public string? Email { get; set; }
+    }
+
 
     public class Contactmodel 
     {
