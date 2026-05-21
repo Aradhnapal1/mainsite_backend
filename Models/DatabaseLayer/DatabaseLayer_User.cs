@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Npgsql;
+using System.Net;
+using System.Net.Mail;
 
 namespace firstproject.Models.DatabaseLayer
 {
@@ -10,6 +12,7 @@ namespace firstproject.Models.DatabaseLayer
         Task<IActionResult> UpdateUser(int id, [FromForm] Usermodel model);
         Task<IActionResult> DeleteUser(int id);
         Task<Usermodel> GetUserByEmail(string email);
+        Task<IActionResult> ForgotPassword(string email);
     }
 
     public partial class DatabaseLayer : IDatabaseLayer
@@ -155,5 +158,102 @@ namespace firstproject.Models.DatabaseLayer
             }
             return user;
         }
+
+
+
+
+
+
+
+        public async Task<IActionResult> ForgotPassword(string email)
+        {
+            try
+            {
+                // Step 1 - Check email
+                if (string.IsNullOrEmpty(email))
+                {
+                    return new BadRequestObjectResult(new
+                    {
+                        status = false,
+                        message = "Email is required"
+                    });
+                }
+
+                // Step 2 - User fetch
+                var user = await GetUserByEmail(email);
+
+                if (user == null)
+                {
+                    return new NotFoundObjectResult(new
+                    {
+                        status = false,
+                        message = "User with this email not found"
+                    });
+                }
+
+                // Step 3 - Gmail credentials
+                var fromEmail = "aradhna9315@gmail.com";
+
+                // App password without spaces
+                var appPassword = "mrprvvjdjpbuuzyw";
+
+                // Step 4 - Mail message
+                MailMessage message = new MailMessage();
+
+                message.From = new MailAddress(fromEmail);
+
+                // User email
+                message.To.Add(email);
+
+                message.Subject = "Forgot Password";
+
+                // Test message
+                message.Body =
+                    $"Hello,\n\nYour forgot password email is working successfully.";
+
+                // Step 5 - SMTP
+                using (var smtp = new SmtpClient("smtp.gmail.com", 587))
+                {
+                    smtp.Credentials =
+                        new NetworkCredential(fromEmail, appPassword);
+
+                    smtp.EnableSsl = true;
+
+                    smtp.UseDefaultCredentials = false;
+
+                    smtp.DeliveryMethod = SmtpDeliveryMethod.Network;
+
+                    await smtp.SendMailAsync(message);
+                }
+
+                // Step 6 - Success response
+                return new OkObjectResult(new
+                {
+                    status = true,
+                    message = "Email sent successfully",
+                    sentTo = email
+                });
+            }
+            catch (Exception ex)
+            {
+                return new BadRequestObjectResult(new
+                {
+                    status = false,
+                    error = ex.Message,
+                    innerError = ex.InnerException?.Message
+                });
+            }
+        }
+
+
+
+
+
+
+
+
+
+
+
     }
 }

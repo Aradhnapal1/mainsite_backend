@@ -139,5 +139,16 @@ namespace firstproject.Controllers
                 }
             });
         }
+
+
+
+
+
+        [HttpPost("forgotpassword")]
+        public async Task<IActionResult> ForgotPassword([FromForm] string email)
+        {
+            var result = await _businessLayer.ForgotPassword(email);
+            return result;
+        }
     }
 }
