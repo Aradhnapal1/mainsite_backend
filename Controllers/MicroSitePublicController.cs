@@ -16,6 +16,20 @@ namespace firstproject.Controllers
             _businessLayer = businessLayer;
         }
 
+        [HttpGet("by-id")]
+        public async Task<IActionResult> GetMicrositeByPublicId([FromQuery] string microsite_id)
+        {
+            if (string.IsNullOrWhiteSpace(microsite_id))
+                return BadRequest(new { status = false, message = "microsite_id required hai." });
+
+            var microsite = await _businessLayer.GetMicrositePublicByUniqueId(microsite_id);
+            if (microsite == null)
+                return NotFound(new { status = false, message = "Microsite nahi mila." });
+
+            var products = await _businessLayer.GetMicrositeProductsByUniqueId(microsite_id);
+            return Ok(new { status = true, data = microsite, products });
+        }
+
         [HttpGet("home")]
         public async Task<IActionResult> GetMicrositeHome([FromQuery] string domain)
         {
@@ -38,6 +52,16 @@ namespace firstproject.Controllers
             });
         }
 
+        [HttpGet("products-by-id")]
+        public async Task<IActionResult> GetProductsByMicrositeId([FromQuery] string microsite_id)
+        {
+            if (string.IsNullOrWhiteSpace(microsite_id))
+                return BadRequest(new { status = false, message = "microsite_id required hai." });
+
+            var products = await _businessLayer.GetMicrositeProductsByUniqueId(microsite_id);
+            return Ok(new { status = true, data = products });
+        }
+
         [HttpGet("products")]
         public async Task<IActionResult> GetProducts([FromQuery] string domain)
         {
@@ -46,6 +70,21 @@ namespace firstproject.Controllers
 
             var products = await _businessLayer.GetMicrositeProducts(domain);
             return Ok(new { status = true, data = products });
+        }
+
+        [HttpGet("product-by-id")]
+        public async Task<IActionResult> GetProductById([FromQuery] string microsite_id, [FromQuery] int product_id)
+        {
+            if (string.IsNullOrWhiteSpace(microsite_id))
+                return BadRequest(new { status = false, message = "microsite_id required hai." });
+            if (product_id <= 0)
+                return BadRequest(new { status = false, message = "product_id required hai." });
+
+            var product = await _businessLayer.GetMicrositeProductByUniqueId(microsite_id, product_id);
+            if (product == null)
+                return NotFound(new { status = false, message = "Product nahi mila ya microsite par assign nahi hai." });
+
+            return Ok(new { status = true, data = product });
         }
 
         [HttpPost("auth/send-otp")]

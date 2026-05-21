@@ -78,8 +78,6 @@ if (corsOrigins == null || corsOrigins.Length == 0)
         "http://localhost:3000",
         "http://localhost",
         "https://localhost:7161",
-        "http://microsite.workarya.com",
-        "https://microsite.workarya.com",
         "http://microsite_backend.workarya.com",
         "https://microsite_backend.workarya.com"
     ];
@@ -180,6 +178,8 @@ if (app.Environment.IsDevelopment())
 
 // ❌ DON'T FORCE HTTPS in dev
 // app.UseHttpsRedirection();
+
+app.UseStaticFiles();
 
 app.UseRouting();
 

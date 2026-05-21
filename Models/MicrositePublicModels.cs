@@ -2,6 +2,7 @@ namespace firstproject.Models
 {
     public class MicrositeOtpSendRequest
     {
+        public string? MicrositeId { get; set; }
         public string Domain { get; set; } = "";
         public string Email { get; set; } = "";
         public string? Name { get; set; }
@@ -9,6 +10,7 @@ namespace firstproject.Models
 
     public class MicrositeOtpVerifyRequest
     {
+        public string? MicrositeId { get; set; }
         public string Domain { get; set; } = "";
         public string Email { get; set; } = "";
         public string Otp { get; set; } = "";
@@ -65,5 +67,7 @@ namespace firstproject.Models
         public decimal? DiscountPrice { get; set; }
         public int Stock { get; set; }
         public List<string> Images { get; set; } = new();
+        public string? CategoryName { get; set; }
+        public string? BrandName { get; set; }
     }
 }

@@ -21,6 +21,7 @@ namespace firstproject.Models
         public List<string> Domains { get; set; } = new();
         public MicrositeTheme? Theme { get; set; }
         public MicrositeSeo? Seo { get; set; }
+        public List<MicrositeAssignedProduct> AssignedProducts { get; set; } = new();
 
         public IFormFile? LogoFile { get; set; }
         public IFormFile? BannerFile { get; set; }

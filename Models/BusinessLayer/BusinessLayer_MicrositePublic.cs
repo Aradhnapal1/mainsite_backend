@@ -9,7 +9,10 @@ namespace firstproject.Models.BusinessLayer
     public partial interface IBusinessLayer
     {
         Task<MicrositeResolvedData?> GetMicrositePublicData(string domain);
+        Task<MicrositeModel?> GetMicrositePublicByUniqueId(string micrositeId);
+        Task<List<MicrositeAssignedProduct>> GetMicrositeProductsByUniqueId(string micrositeId);
         Task<List<MicrositeAssignedProduct>> GetMicrositeProducts(string domain);
+        Task<MicrositeAssignedProduct?> GetMicrositeProductByUniqueId(string micrositeId, int productId);
         Task<IActionResult> SendMicrositeOtp(MicrositeOtpSendRequest request);
         Task<IActionResult> VerifyMicrositeOtp(MicrositeOtpVerifyRequest request);
         Task<IActionResult> PlaceMicrositeOrder(string token, MicrositeSingleOrderRequest request);
@@ -29,6 +32,21 @@ namespace firstproject.Models.BusinessLayer
             return await _databaseLayer.ResolveMicrositeByDomain(domain);
         }
 
+        public async Task<MicrositeModel?> GetMicrositePublicByUniqueId(string micrositeId)
+        {
+            await _databaseLayer.EnsureMicrositePublicSchema();
+            return await _databaseLayer.GetMicrositeByUniqueId(micrositeId);
+        }
+
+        public async Task<List<MicrositeAssignedProduct>> GetMicrositeProductsByUniqueId(string micrositeId)
+        {
+            await _databaseLayer.EnsureMicrositePublicSchema();
+            var microsite = await _databaseLayer.GetMicrositeByUniqueId(micrositeId);
+            if (microsite == null)
+                return new List<MicrositeAssignedProduct>();
+            return await _databaseLayer.GetMicrositeProducts(microsite.Id);
+        }
+
         public async Task<List<MicrositeAssignedProduct>> GetMicrositeProducts(string domain)
         {
             await _databaseLayer.EnsureMicrositePublicSchema();
@@ -38,16 +56,36 @@ namespace firstproject.Models.BusinessLayer
             return await _databaseLayer.GetMicrositeProducts(microsite.MicrositeId);
         }
 
+        public async Task<MicrositeAssignedProduct?> GetMicrositeProductByUniqueId(string micrositeId, int productId)
+        {
+            await _databaseLayer.EnsureMicrositePublicSchema();
+            var microsite = await _databaseLayer.ResolveMicrositeByUniqueId(micrositeId);
+            if (microsite == null || productId <= 0)
+                return null;
+            return await _databaseLayer.GetMicrositeProduct(microsite.MicrositeId, productId);
+        }
+
+        private async Task<MicrositeResolvedData?> ResolveMicrositeForPublic(string? micrositeId, string? domain)
+        {
+            if (!string.IsNullOrWhiteSpace(micrositeId))
+                return await _databaseLayer.ResolveMicrositeByUniqueId(micrositeId);
+            if (!string.IsNullOrWhiteSpace(domain))
+                return await _databaseLayer.ResolveMicrositeByDomain(domain);
+            return null;
+        }
+
         public async Task<IActionResult> SendMicrositeOtp(MicrositeOtpSendRequest request)
         {
             await _databaseLayer.EnsureMicrositePublicSchema();
 
-            if (string.IsNullOrWhiteSpace(request.Domain) || string.IsNullOrWhiteSpace(request.Email))
-                return new BadRequestObjectResult(new { status = false, message = "Domain aur email required hain." });
+            if (string.IsNullOrWhiteSpace(request.Email))
+                return new BadRequestObjectResult(new { status = false, message = "Email required hai." });
+            if (string.IsNullOrWhiteSpace(request.MicrositeId) && string.IsNullOrWhiteSpace(request.Domain))
+                return new BadRequestObjectResult(new { status = false, message = "microsite_id ya domain required hai." });
 
-            var microsite = await _databaseLayer.ResolveMicrositeByDomain(request.Domain);
+            var microsite = await ResolveMicrositeForPublic(request.MicrositeId, request.Domain);
             if (microsite == null)
-                return new NotFoundObjectResult(new { status = false, message = "Microsite domain invalid hai." });
+                return new NotFoundObjectResult(new { status = false, message = "Microsite invalid hai." });
 
             var otp = _random.Next(100000, 999999).ToString();
             var expiry = DateTime.UtcNow.AddMinutes(10);
@@ -74,12 +112,14 @@ namespace firstproject.Models.BusinessLayer
         {
             await _databaseLayer.EnsureMicrositePublicSchema();
 
-            if (string.IsNullOrWhiteSpace(request.Domain) || string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Otp))
-                return new BadRequestObjectResult(new { status = false, message = "Domain, email aur OTP required hain." });
+            if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Otp))
+                return new BadRequestObjectResult(new { status = false, message = "Email aur OTP required hain." });
+            if (string.IsNullOrWhiteSpace(request.MicrositeId) && string.IsNullOrWhiteSpace(request.Domain))
+                return new BadRequestObjectResult(new { status = false, message = "microsite_id ya domain required hai." });
 
-            var microsite = await _databaseLayer.ResolveMicrositeByDomain(request.Domain);
+            var microsite = await ResolveMicrositeForPublic(request.MicrositeId, request.Domain);
             if (microsite == null)
-                return new NotFoundObjectResult(new { status = false, message = "Microsite domain invalid hai." });
+                return new NotFoundObjectResult(new { status = false, message = "Microsite invalid hai." });
 
             var isValidOtp = await _databaseLayer.VerifyMicrositeOtp(microsite.MicrositeId, request.Email, request.Otp);
             if (!isValidOtp)

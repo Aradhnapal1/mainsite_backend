@@ -8,6 +8,8 @@ namespace firstproject.Models.DatabaseLayer
     {
         Task EnsureMicrositePublicSchema();
         Task<MicrositeResolvedData?> ResolveMicrositeByDomain(string domain);
+        Task<MicrositeResolvedData?> ResolveMicrositeByUniqueId(string micrositeId);
+        Task<MicrositeAssignedProduct?> GetMicrositeProduct(long micrositeId, int productId);
         Task<List<MicrositeAssignedProduct>> GetMicrositeProducts(long micrositeId);
         Task<int> CreateMicrositeOtp(long micrositeId, string email, string otp, DateTime expiresAtUtc);
         Task<bool> VerifyMicrositeOtp(long micrositeId, string email, string otp);
@@ -137,6 +139,78 @@ LIMIT 1;";
             };
         }
 
+        public async Task<MicrositeResolvedData?> ResolveMicrositeByUniqueId(string micrositeId)
+        {
+            if (string.IsNullOrWhiteSpace(micrositeId))
+                return null;
+
+            var normalizedId = micrositeId.Trim().Replace("-", "").ToLowerInvariant();
+
+            using var connection = new NpgsqlConnection(this.DbConnection);
+            await connection.OpenAsync();
+
+            const string sql = @"
+SELECT m.id, m.name, m.heading, m.content, m.email, m.mobile, m.logo_image, m.banner_image,
+       d.domain,
+       t.header_color, t.text_color, t.background_color, t.button_color, t.button_text_color, t.footer_color, t.footer_text_color, t.font_family,
+       s.meta_title, s.meta_description, s.meta_keywords, s.og_image
+FROM microsites m
+LEFT JOIN microsite_domains d ON d.microsite_id = m.id
+LEFT JOIN microsite_themes t ON t.microsite_id = m.id
+LEFT JOIN microsite_seo s ON s.microsite_id = m.id
+WHERE LOWER(REPLACE(m.unique_id::text, '-', '')) = @uid AND m.status = true
+ORDER BY d.id NULLS LAST
+LIMIT 1;";
+
+            using var cmd = new NpgsqlCommand(sql, connection);
+            cmd.Parameters.AddWithValue("@uid", normalizedId);
+            using var reader = await cmd.ExecuteReaderAsync();
+
+            if (!await reader.ReadAsync())
+                return null;
+
+            var domain = reader["domain"]?.ToString();
+            if (string.IsNullOrWhiteSpace(domain))
+                domain = micrositeId.Trim();
+
+            return new MicrositeResolvedData
+            {
+                MicrositeId = Convert.ToInt64(reader["id"]),
+                Domain = domain,
+                Name = reader["name"]?.ToString() ?? "",
+                Heading = reader["heading"]?.ToString(),
+                Content = reader["content"]?.ToString(),
+                Email = reader["email"]?.ToString(),
+                Mobile = reader["mobile"]?.ToString(),
+                LogoImage = reader["logo_image"]?.ToString(),
+                BannerImage = reader["banner_image"]?.ToString(),
+                Theme = new
+                {
+                    headerColor = reader["header_color"]?.ToString(),
+                    textColor = reader["text_color"]?.ToString(),
+                    backgroundColor = reader["background_color"]?.ToString(),
+                    buttonColor = reader["button_color"]?.ToString(),
+                    buttonTextColor = reader["button_text_color"]?.ToString(),
+                    footerColor = reader["footer_color"]?.ToString(),
+                    footerTextColor = reader["footer_text_color"]?.ToString(),
+                    fontFamily = reader["font_family"]?.ToString()
+                },
+                Seo = new
+                {
+                    metaTitle = reader["meta_title"]?.ToString(),
+                    metaDescription = reader["meta_description"]?.ToString(),
+                    metaKeywords = reader["meta_keywords"]?.ToString(),
+                    ogImage = reader["og_image"]?.ToString()
+                }
+            };
+        }
+
+        public async Task<MicrositeAssignedProduct?> GetMicrositeProduct(long micrositeId, int productId)
+        {
+            var products = await GetMicrositeProducts(micrositeId);
+            return products.FirstOrDefault(p => p.ProductId == productId);
+        }
+
         public async Task<List<MicrositeAssignedProduct>> GetMicrositeProducts(long micrositeId)
         {
             var list = new List<MicrositeAssignedProduct>();
@@ -144,9 +218,12 @@ LIMIT 1;";
             await connection.OpenAsync();
 
             const string sql = @"
-SELECT p.id, p.productname, p.slug, p.description, p.price, p.discountprice, p.stock, p.image, p.imagegallery
+SELECT p.id, p.productname, p.slug, p.description, p.price, p.discountprice, p.stock, p.image, p.imagegallery,
+       b.brandname, c.""Name"" AS category_name
 FROM assign_product ap
 JOIN product p ON p.id = ap.product_id
+LEFT JOIN brand b ON p.brandid = b.id
+LEFT JOIN category c ON p.categoryid = c.""Id""
 WHERE ap.microsite_id = @mid AND ap.status = true AND p.isactive = true
 ORDER BY ap.id DESC;";
 
@@ -155,11 +232,7 @@ ORDER BY ap.id DESC;";
             using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
             {
-                var images = new List<string>();
-                if (reader["image"] != DBNull.Value && !string.IsNullOrWhiteSpace(reader["image"]?.ToString()))
-                    images.Add(reader["image"]?.ToString() ?? "");
-                if (reader["imagegallery"] != DBNull.Value)
-                    images.AddRange((string[])reader["imagegallery"]);
+                var images = ReadProductImageList(reader);
 
                 list.Add(new MicrositeAssignedProduct
                 {
@@ -170,7 +243,9 @@ ORDER BY ap.id DESC;";
                     Price = Convert.ToDecimal(reader["price"]),
                     DiscountPrice = reader["discountprice"] == DBNull.Value ? null : Convert.ToDecimal(reader["discountprice"]),
                     Stock = Convert.ToInt32(reader["stock"]),
-                    Images = images
+                    Images = images,
+                    BrandName = reader["brandname"]?.ToString(),
+                    CategoryName = reader["category_name"]?.ToString()
                 });
             }
 
