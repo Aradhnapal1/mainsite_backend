@@ -9,6 +9,7 @@ namespace firstproject.Models.BusinessLayer
         Task<IActionResult> UpdateUser(int id, [FromForm] Usermodel model);
         Task<IActionResult> DeleteUser(int id);
         Task<Usermodel> GetUserByEmail(string email);
+        Task<IActionResult> ForgotPassword([FromForm] string email);
     }
 
     public partial class BusinessLayer : IBusinessLayer
@@ -48,5 +49,11 @@ namespace firstproject.Models.BusinessLayer
         {
             return await _databaseLayer.GetUserByEmail(email);
         }
+
+        public async Task<IActionResult> ForgotPassword(string email)
+        {
+            return await _databaseLayer.ForgotPassword(email);
+        }
+
     }
 }
