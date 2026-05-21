@@ -15,24 +15,38 @@
         }
     }
 
-    function setImage(id, value, fallback) {
+    function setImage(id, value) {
         var el = document.getElementById(id);
-        if (el && el.tagName === "IMG") {
-            el.src = value || fallback || el.src;
-        }
+        if (!el || el.tagName !== "IMG" || !value) return;
+        el.src = value;
+        el.style.display = "";
+    }
+
+    function themeVal(theme, camel, snake) {
+        if (!theme) return "";
+        return theme[camel] || theme[snake] || "";
     }
 
     function applyTheme(theme) {
         if (!theme) return;
         var root = document.documentElement;
-        if (theme.headerColor) root.style.setProperty("--ms-header-color", theme.headerColor);
-        if (theme.textColor) root.style.setProperty("--ms-text-color", theme.textColor);
-        if (theme.backgroundColor) root.style.setProperty("--ms-bg-color", theme.backgroundColor);
-        if (theme.buttonColor) root.style.setProperty("--ms-button-color", theme.buttonColor);
-        if (theme.buttonTextColor) root.style.setProperty("--ms-button-text-color", theme.buttonTextColor);
-        if (theme.footerColor) root.style.setProperty("--ms-footer-color", theme.footerColor);
-        if (theme.footerTextColor) root.style.setProperty("--ms-footer-text-color", theme.footerTextColor);
-        if (theme.fontFamily) root.style.setProperty("--ms-font-family", theme.fontFamily);
+        var headerColor = themeVal(theme, "headerColor", "header_color");
+        var textColor = themeVal(theme, "textColor", "text_color");
+        var backgroundColor = themeVal(theme, "backgroundColor", "background_color");
+        var buttonColor = themeVal(theme, "buttonColor", "button_color");
+        var buttonTextColor = themeVal(theme, "buttonTextColor", "button_text_color");
+        var footerColor = themeVal(theme, "footerColor", "footer_color");
+        var footerTextColor = themeVal(theme, "footerTextColor", "footer_text_color");
+        var fontFamily = themeVal(theme, "fontFamily", "font_family");
+
+        if (headerColor) root.style.setProperty("--ms-header-color", headerColor);
+        if (textColor) root.style.setProperty("--ms-text-color", textColor);
+        if (backgroundColor) root.style.setProperty("--ms-bg-color", backgroundColor);
+        if (buttonColor) root.style.setProperty("--ms-button-color", buttonColor);
+        if (buttonTextColor) root.style.setProperty("--ms-button-text-color", buttonTextColor);
+        if (footerColor) root.style.setProperty("--ms-footer-color", footerColor);
+        if (footerTextColor) root.style.setProperty("--ms-footer-text-color", footerTextColor);
+        if (fontFamily) root.style.setProperty("--ms-font-family", fontFamily);
     }
 
     function applySeo(seo, siteName, favicon) {
@@ -191,8 +205,12 @@
 
         var logoUrl = resolveAssetUrl(m.logoImage);
         var bannerUrl = resolveAssetUrl(m.bannerImage);
-        setImage("msLogo", logoUrl, "https://via.placeholder.com/120x48?text=Logo");
-        setImage("msBanner", bannerUrl, "https://via.placeholder.com/1200x350?text=Banner");
+        if (logoUrl) setImage("msLogo", logoUrl);
+        if (bannerUrl) {
+            setImage("msBanner", bannerUrl);
+            var bannerEl = document.getElementById("msBanner");
+            if (bannerEl) bannerEl.style.display = "";
+        }
 
         applyTheme(m.theme || {});
         applySeo(m.seo || {}, name, m.favicon);
@@ -407,19 +425,21 @@
         var bundle = await fetchMicrositeBundle(context);
 
         if (!bundle.microsite) {
-            if (window.iziToast) {
+            if (document.getElementById("msProducts") && window.iziToast) {
                 iziToast.warning({
                     title: "Microsite",
                     message: "Microsite data load nahi hui. URL me microsite_id check karein.",
                     position: "topRight",
                 });
             }
-            renderProducts([]);
+            if (document.getElementById("msProducts")) renderProducts([]);
             return;
         }
 
         bindMicrosite(bundle.microsite);
-        renderProducts(bundle.products);
+        if (document.getElementById("msProducts")) {
+            renderProducts(bundle.products);
+        }
 
         if (window.MicrositeApp && window.MicrositeApp.updateCartBadge) {
             window.MicrositeApp.updateCartBadge();

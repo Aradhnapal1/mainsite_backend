@@ -310,7 +310,10 @@
         if (cat) cat.textContent = norm.category || "Product";
         if (desc) desc.textContent = norm.description || "No description available.";
         if (stock) stock.textContent = norm.stock > 0 ? "In stock (" + norm.stock + ")" : "Out of stock";
-        if (img) img.src = norm.images[0] || "https://via.placeholder.com/600x600?text=Product";
+        if (img && norm.images[0]) {
+            img.src = norm.images[0];
+            img.style.display = "";
+        }
 
         var priceHtml = "₹" + norm.price;
         if (norm.originalPrice > norm.price) {

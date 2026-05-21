@@ -1,0 +1,72 @@
+/* Theme colors come only from API via JS (CSS variables). No hardcoded palette here. */
+body {
+    background: var(--ms-bg-color);
+    font-family: var(--ms-font-family, inherit);
+    color: #212529;
+}
+.ms-header {
+    background: var(--ms-header-color);
+    color: var(--ms-text-color);
+}
+.ms-header a,
+.ms-header .text-reset {
+    color: var(--ms-text-color);
+}
+.ms-footer {
+    background: var(--ms-footer-color);
+    color: var(--ms-footer-text-color);
+}
+.ms-btn {
+    background: var(--ms-button-color);
+    color: var(--ms-button-text-color);
+    border-color: var(--ms-button-color);
+}
+.ms-btn:hover {
+    opacity: 0.9;
+    color: var(--ms-button-text-color);
+}
+.ms-logo {
+    max-height: 48px;
+    width: auto;
+}
+.ms-banner {
+    width: 100%;
+    max-height: 350px;
+    object-fit: cover;
+    border-radius: 10px;
+}
+.ms-header-nav {
+    align-items: center;
+}
+.ms-header-nav a {
+    text-decoration: none;
+}
+.ms-header-nav a:hover {
+    opacity: 0.85;
+}
+.ms-cart-link {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    font-size: 1.35rem;
+    line-height: 1;
+}
+.ms-cart-badge {
+    position: absolute;
+    top: -6px;
+    right: -10px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: var(--ms-button-color);
+    color: var(--ms-button-text-color);
+    font-size: 11px;
+    font-weight: 700;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+.ms-cart-badge.show {
+    display: inline-flex;
+}
