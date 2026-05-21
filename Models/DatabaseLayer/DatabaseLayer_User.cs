@@ -12,6 +12,9 @@ namespace firstproject.Models.DatabaseLayer
         Task<Usermodel> GetUserByEmail(string email);
         Task EnsureUserPasswordResetSchema();
         Task SaveUserPasswordResetOtp(int userId, string otp, DateTime expiresAtUtc);
+        Task<int?> GetValidUserPasswordResetId(string email, string otp);
+        Task<bool> MarkUserPasswordResetUsed(int resetId);
+        Task<bool> UpdateUserPassword(int userId, string hashedPassword);
     }
 
     public partial class DatabaseLayer : IDatabaseLayer
@@ -194,6 +197,54 @@ VALUES (@userId, @otp, @expiresAt);";
             cmd.Parameters.AddWithValue("@otp", otp);
             cmd.Parameters.AddWithValue("@expiresAt", expiresAtUtc);
             await cmd.ExecuteNonQueryAsync();
+        }
+
+        public async Task<int?> GetValidUserPasswordResetId(string email, string otp)
+        {
+            await EnsureUserPasswordResetSchema();
+            using var connection = new NpgsqlConnection(DbConnection);
+            await connection.OpenAsync();
+            const string sql = @"
+SELECT r.id
+FROM user_password_reset r
+INNER JOIN users u ON u.id = r.user_id
+WHERE LOWER(u.email) = LOWER(@email)
+  AND r.otp = @otp
+  AND r.is_used = FALSE
+  AND r.expires_at >= NOW()
+ORDER BY r.id DESC
+LIMIT 1;";
+            using var cmd = new NpgsqlCommand(sql, connection);
+            cmd.Parameters.AddWithValue("@email", email.Trim());
+            cmd.Parameters.AddWithValue("@otp", otp.Trim());
+            var result = await cmd.ExecuteScalarAsync();
+            if (result == null || result == DBNull.Value)
+                return null;
+            return Convert.ToInt32(result);
+        }
+
+        public async Task<bool> MarkUserPasswordResetUsed(int resetId)
+        {
+            await EnsureUserPasswordResetSchema();
+            using var connection = new NpgsqlConnection(DbConnection);
+            await connection.OpenAsync();
+            const string sql = @"UPDATE user_password_reset SET is_used = TRUE WHERE id = @id AND is_used = FALSE;";
+            using var cmd = new NpgsqlCommand(sql, connection);
+            cmd.Parameters.AddWithValue("@id", resetId);
+            var rows = await cmd.ExecuteNonQueryAsync();
+            return rows > 0;
+        }
+
+        public async Task<bool> UpdateUserPassword(int userId, string hashedPassword)
+        {
+            using var connection = new NpgsqlConnection(DbConnection);
+            await connection.OpenAsync();
+            const string sql = @"UPDATE users SET password = @password WHERE id = @id;";
+            using var cmd = new NpgsqlCommand(sql, connection);
+            cmd.Parameters.AddWithValue("@id", userId);
+            cmd.Parameters.AddWithValue("@password", hashedPassword);
+            var rows = await cmd.ExecuteNonQueryAsync();
+            return rows > 0;
         }
 
 

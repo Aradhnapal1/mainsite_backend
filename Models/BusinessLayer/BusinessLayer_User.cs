@@ -11,6 +11,8 @@ namespace firstproject.Models.BusinessLayer
         Task<IActionResult> DeleteUser(int id);
         Task<Usermodel> GetUserByEmail(string email);
         Task<IActionResult> ForgotPassword([FromForm] string email);
+        Task<IActionResult> VerifyForgotPasswordOtp(string email, string otp);
+        Task<IActionResult> ResetPasswordWithOtp(string email, string otp, string newPassword, string confirmPassword);
     }
 
     public partial class BusinessLayer : IBusinessLayer
@@ -75,13 +77,13 @@ namespace firstproject.Models.BusinessLayer
 
             var subject = "Forgot Password - OTP";
             var html = $@"<div style='font-family:Arial,sans-serif;max-width:520px;margin:auto'>
-<h2 style='color:#1f2937'>Password Reset OTP</h2>
-<p>Hi {displayName},</p>
-<p>Your password reset OTP is:</p>
-<p style='font-size:28px;font-weight:bold;letter-spacing:4px;color:#2563eb'>{otp}</p>
-<p>This OTP is valid for <strong>15 minutes</strong>.</p>
-<p style='color:#6b7280;font-size:12px'>If you did not request this, please ignore this email.</p>
-</div>";
+                <h2 style='color:#1f2937'>Password Reset OTP</h2>
+                <p>Hi {displayName},</p>
+                <p>Your password reset OTP is:</p>
+                <p style='font-size:28px;font-weight:bold;letter-spacing:4px;color:#2563eb'>{otp}</p>
+                <p>This OTP is valid for <strong>15 minutes</strong>.</p>
+                <p style='color:#6b7280;font-size:12px'>If you did not request this, please ignore this email.</p>
+                </div>";
             var plain = $"Hi {displayName},\n\nYour password reset OTP is: {otp}\nValid for 15 minutes.\n";
 
             try
@@ -105,6 +107,109 @@ namespace firstproject.Models.BusinessLayer
                 message = "Forgot password OTP sent to your email.",
                 sentTo = normalizedEmail,
                 expiryMinutes = 15
+            });
+        }
+
+        public async Task<IActionResult> VerifyForgotPasswordOtp(string email, string otp)
+        {
+            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(otp))
+            {
+                return new BadRequestObjectResult(new { status = false, message = "Email and OTP are required" });
+            }
+
+            var normalizedEmail = email.Trim().ToLowerInvariant();
+            var resetId = await _databaseLayer.GetValidUserPasswordResetId(normalizedEmail, otp.Trim());
+            if (resetId == null)
+            {
+                return new UnauthorizedObjectResult(new { status = false, message = "Invalid or expired OTP" });
+            }
+
+            return new OkObjectResult(new
+            {
+                status = true,
+                message = "OTP verified. Set your new password.",
+                verified = true
+            });
+        }
+
+        public async Task<IActionResult> ResetPasswordWithOtp(string email, string otp, string newPassword, string confirmPassword)
+        {
+            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(otp))
+            {
+                return new BadRequestObjectResult(new { status = false, message = "Email and OTP are required" });
+            }
+
+            if (string.IsNullOrWhiteSpace(newPassword) || string.IsNullOrWhiteSpace(confirmPassword))
+            {
+                return new BadRequestObjectResult(new { status = false, message = "New password and confirm password are required" });
+            }
+
+            if (!string.Equals(newPassword, confirmPassword, StringComparison.Ordinal))
+            {
+                return new BadRequestObjectResult(new { status = false, message = "Passwords do not match" });
+            }
+
+            if (newPassword.Length < 6)
+            {
+                return new BadRequestObjectResult(new { status = false, message = "Password must be at least 6 characters" });
+            }
+
+            var normalizedEmail = email.Trim().ToLowerInvariant();
+            var resetId = await _databaseLayer.GetValidUserPasswordResetId(normalizedEmail, otp.Trim());
+            if (resetId == null)
+            {
+                return new UnauthorizedObjectResult(new { status = false, message = "Invalid or expired OTP" });
+            }
+
+            var user = await _databaseLayer.GetUserByEmail(normalizedEmail);
+            if (user == null || user.Id <= 0)
+            {
+                return new NotFoundObjectResult(new { status = false, message = "User not found" });
+            }
+
+            var hashedPassword = BCrypt.Net.BCrypt.HashPassword(newPassword);
+            var updated = await _databaseLayer.UpdateUserPassword(user.Id, hashedPassword);
+            if (!updated)
+            {
+                return new BadRequestObjectResult(new { status = false, message = "Failed to update password" });
+            }
+
+            await _databaseLayer.MarkUserPasswordResetUsed(resetId.Value);
+
+            var displayName = string.IsNullOrWhiteSpace(user.Firstname)
+                ? "User"
+                : $"{user.Firstname} {user.Lastname}".Trim();
+
+            var subject = "Password Changed Successfully";
+            var html = $@"<div style='font-family:Arial,sans-serif;max-width:520px;margin:auto'>
+                <h2 style='color:#1f2937'>Password Updated</h2>
+                <p>Hi {displayName},</p>
+                <p>Your account password was changed successfully.</p>
+                <p>If you did not make this change, please contact support immediately.</p>
+                <p style='color:#6b7280;font-size:12px'>This is an automated message from Hyper Scripts.</p>
+                </div>";
+            var plain = $"Hi {displayName},\n\nYour password was changed successfully.\nIf you did not make this change, contact support.\n";
+
+            try
+            {
+                await SmtpEmailHelper.SendAsync(_configuration, normalizedEmail, subject, html, plain);
+            }
+            catch (Exception ex)
+            {
+                return new OkObjectResult(new
+                {
+                    status = true,
+                    message = "Password updated but confirmation email could not be sent.",
+                    emailSent = false,
+                    error = ex.Message
+                });
+            }
+
+            return new OkObjectResult(new
+            {
+                status = true,
+                message = "Password changed successfully. Confirmation email sent.",
+                emailSent = true
             });
         }
 

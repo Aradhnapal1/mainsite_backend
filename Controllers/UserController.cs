@@ -151,5 +151,23 @@ namespace firstproject.Controllers
             var result = await _businessLayer.ForgotPassword(resolvedEmail ?? "");
             return result;
         }
+
+        [HttpPost("verifyforgotpasswordotp")]
+        public async Task<IActionResult> VerifyForgotPasswordOtp([FromBody] ForgotPasswordVerifyOtpRequest? body)
+        {
+            var result = await _businessLayer.VerifyForgotPasswordOtp(body?.Email ?? "", body?.Otp ?? "");
+            return result;
+        }
+
+        [HttpPost("resetpassword")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest? body)
+        {
+            var result = await _businessLayer.ResetPasswordWithOtp(
+                body?.Email ?? "",
+                body?.Otp ?? "",
+                body?.NewPassword ?? "",
+                body?.ConfirmPassword ?? "");
+            return result;
+        }
     }
 }
