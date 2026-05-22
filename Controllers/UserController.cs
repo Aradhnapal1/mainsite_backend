@@ -169,5 +169,19 @@ namespace firstproject.Controllers
                 body?.ConfirmPassword ?? "");
             return result;
         }
+
+
+
+        [HttpPost("changepassword")]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest? body)
+        {
+            var result = await _businessLayer.ChangePassword(
+                body?.Email ?? "",
+                body?.OldPassword ?? "",
+                body?.NewPassword ?? "",
+                body?.ConfirmPassword ?? "");
+
+            return result;
+        }
     }
 }

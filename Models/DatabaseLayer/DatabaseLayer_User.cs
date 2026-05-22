@@ -15,6 +15,7 @@ namespace firstproject.Models.DatabaseLayer
         Task<int?> GetValidUserPasswordResetId(string email, string otp);
         Task<bool> MarkUserPasswordResetUsed(int resetId);
         Task<bool> UpdateUserPassword(int userId, string hashedPassword);
+        Task<bool> ChangePassword(int userId, string hashedPassword);
     }
 
     public partial class DatabaseLayer : IDatabaseLayer
@@ -254,7 +255,26 @@ LIMIT 1;";
 
 
 
+        public async Task<bool> ChangePassword(int userId, string hashedPassword)
+        {
+            using var connection = new NpgsqlConnection(DbConnection);
 
+            await connection.OpenAsync();
+
+            const string sql = @"
+        UPDATE users
+        SET password = @password
+        WHERE id = @id";
+
+            using var cmd = new NpgsqlCommand(sql, connection);
+
+            cmd.Parameters.AddWithValue("@id", userId);
+            cmd.Parameters.AddWithValue("@password", hashedPassword);
+
+            int rows = await cmd.ExecuteNonQueryAsync();
+
+            return rows > 0;
+        }
 
 
     }

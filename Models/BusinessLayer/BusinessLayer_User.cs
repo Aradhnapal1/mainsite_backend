@@ -13,6 +13,7 @@ namespace firstproject.Models.BusinessLayer
         Task<IActionResult> ForgotPassword([FromForm] string email);
         Task<IActionResult> VerifyForgotPasswordOtp(string email, string otp);
         Task<IActionResult> ResetPasswordWithOtp(string email, string otp, string newPassword, string confirmPassword);
+        Task<IActionResult> ChangePassword(string email, string oldPassword, string newPassword, string confirmPassword);
     }
 
     public partial class BusinessLayer : IBusinessLayer
@@ -213,5 +214,99 @@ namespace firstproject.Models.BusinessLayer
             });
         }
 
+
+
+
+        public async Task<IActionResult> ChangePassword(
+    string email,
+    string oldPassword,
+    string newPassword,
+    string confirmPassword)
+        {
+            if (string.IsNullOrWhiteSpace(email) ||
+                string.IsNullOrWhiteSpace(oldPassword) ||
+                string.IsNullOrWhiteSpace(newPassword) ||
+                string.IsNullOrWhiteSpace(confirmPassword))
+            {
+                return new BadRequestObjectResult(new
+                {
+                    status = false,
+                    message = "All fields are required"
+                });
+            }
+
+            if (newPassword != confirmPassword)
+            {
+                return new BadRequestObjectResult(new
+                {
+                    status = false,
+                    message = "New password and confirm password do not match"
+                });
+            }
+
+            if (newPassword.Length < 6)
+            {
+                return new BadRequestObjectResult(new
+                {
+                    status = false,
+                    message = "Password must be at least 6 characters"
+                });
+            }
+
+            // User fetch
+            var user = await _databaseLayer.GetUserByEmail(email.Trim().ToLower());
+
+            if (user == null)
+            {
+                return new NotFoundObjectResult(new
+                {
+                    status = false,
+                    message = "User not found"
+                });
+            }
+
+            // Old password verify
+            bool isOldPasswordCorrect = BCrypt.Net.BCrypt.Verify(oldPassword, user.Password);
+
+            if (!isOldPasswordCorrect)
+            {
+                return new UnauthorizedObjectResult(new
+                {
+                    status = false,
+                    message = "Old password is incorrect"
+                });
+            }
+
+            // Same password check
+            if (BCrypt.Net.BCrypt.Verify(newPassword, user.Password))
+            {
+                return new BadRequestObjectResult(new
+                {
+                    status = false,
+                    message = "New password cannot be same as old password"
+                });
+            }
+
+            // Hash new password
+            var hashedPassword = BCrypt.Net.BCrypt.HashPassword(newPassword);
+
+            // Update in DB
+            var updated = await _databaseLayer.ChangePassword(user.Id, hashedPassword);
+
+            if (!updated)
+            {
+                return new BadRequestObjectResult(new
+                {
+                    status = false,
+                    message = "Failed to change password"
+                });
+            }
+
+            return new OkObjectResult(new
+            {
+                status = true,
+                message = "Password changed successfully"
+            });
+        }
     }
 }
