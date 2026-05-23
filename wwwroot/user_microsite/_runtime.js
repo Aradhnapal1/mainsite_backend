@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
     var API_BASE = window.MICROSITE_API_BASE || window.API_BASE || window.domain || "http://microsite_backend.workarya.com";
 
     function safeText(value, fallback) {
@@ -91,11 +91,17 @@
 
     function micrositeFromPayload(payload) {
         if (!payload) return null;
-        if (payload.data && payload.data.id) return payload.data;
-        if (payload.data && !Array.isArray(payload.data)) return payload.data;
+        if (payload.data && payload.data.microsite) return payload.data.microsite;
+        if (payload.data && (payload.data.id || payload.data.Id || payload.data.uniqueId || payload.data.UniqueId || payload.data.name)) {
+            return payload.data;
+        }
         if (Array.isArray(payload) && payload.length > 0) return payload[0];
-        if (payload.id) return payload;
+        if (payload.id || payload.Id || payload.uniqueId || payload.UniqueId || payload.name) return payload;
         return null;
+    }
+
+    function isValidMicrosite(m) {
+        return !!(m && (m.id || m.Id || m.uniqueId || m.UniqueId || m.name || m.Name));
     }
 
     function extractProducts(payload) {
@@ -104,12 +110,21 @@
         if (Array.isArray(payload.assignedProducts)) return payload.assignedProducts;
         if (payload.data && Array.isArray(payload.data.assignedProducts)) return payload.data.assignedProducts;
         if (payload.data && Array.isArray(payload.data.products)) return payload.data.products;
-        if (Array.isArray(payload.data) && payload.data.length && payload.data[0].productId) return payload.data;
+        if (payload.data && payload.data.microsite && Array.isArray(payload.data.microsite.assignedProducts)) {
+            return payload.data.microsite.assignedProducts;
+        }
+        if (Array.isArray(payload.data) && payload.data.length && (payload.data[0].productId || payload.data[0].ProductId)) {
+            return payload.data;
+        }
         return [];
     }
 
     function getApiBase() {
-        var base = window.MICROSITE_API_BASE || window.location.origin || "";
+        var base =
+            window.MICROSITE_API_BASE ||
+            window.API_BASE ||
+            window.domain ||
+            "http://microsite_backend.workarya.com";
         return String(base).replace(/\/$/, "");
     }
 
@@ -142,16 +157,17 @@
         var domain = context && context.domain ? context.domain : "";
 
         var endpoints = [];
+        var api = getApiBase();
         if (micrositeId) {
             endpoints.push(
-                API_BASE + "/api/microsite-public/by-id?microsite_id=" + encodeURIComponent(micrositeId)
+                api + "/api/microsite-public/by-id?microsite_id=" + encodeURIComponent(micrositeId)
             );
         }
         if (slug) {
-            endpoints.push(API_BASE + "/api/microsite/slug/" + encodeURIComponent(slug));
+            endpoints.push(api + "/api/microsite/slug/" + encodeURIComponent(slug));
         }
         if (domain) {
-            endpoints.push(API_BASE + "/api/microsite-public/home?domain=" + encodeURIComponent(domain));
+            endpoints.push(api + "/api/microsite-public/home?domain=" + encodeURIComponent(domain));
         }
 
         for (var i = 0; i < endpoints.length; i += 1) {
@@ -160,7 +176,7 @@
                 if (!res.ok) continue;
                 var data = await res.json();
                 var microsite = micrositeFromPayload(data);
-                if (!microsite || !microsite.id) continue;
+                if (!isValidMicrosite(microsite)) continue;
 
                 var products = extractProducts(data);
                 if (!products.length && micrositeId) {
@@ -181,7 +197,7 @@
     async function fetchProductsFallback(micrositeId) {
         try {
             var res = await fetch(
-                API_BASE + "/api/microsite-public/products-by-id?microsite_id=" + encodeURIComponent(micrositeId)
+                getApiBase() + "/api/microsite-public/products-by-id?microsite_id=" + encodeURIComponent(micrositeId)
             );
             if (!res.ok) return [];
             var data = await res.json();
@@ -194,7 +210,7 @@
     async function fetchProductsByDomain(domain) {
         try {
             var res = await fetch(
-                API_BASE + "/api/microsite-public/products?domain=" + encodeURIComponent(domain)
+                getApiBase() + "/api/microsite-public/products?domain=" + encodeURIComponent(domain)
             );
             if (!res.ok) return [];
             var data = await res.json();
@@ -564,7 +580,7 @@
         var bundle = await fetchMicrositeBundle(context);
 
         if (!bundle.microsite) {
-            if (document.getElementById("msProducts") && window.iziToast) {
+            if (window.iziToast) {
                 iziToast.warning({
                     title: "Microsite",
                     message: "Microsite data load nahi hui. URL me microsite_id check karein.",
@@ -572,12 +588,11 @@
                 });
             }
             if (document.getElementById("msProducts")) renderProducts([]);
-            return;
-        }
-
-        bindMicrosite(bundle.microsite);
-        if (document.getElementById("msProducts")) {
-            renderProducts(bundle.products);
+        } else {
+            bindMicrosite(bundle.microsite);
+            if (document.getElementById("msProducts")) {
+                renderProducts(bundle.products);
+            }
         }
 
         if (window.MicrositeApp && window.MicrositeApp.updateCartBadge) {

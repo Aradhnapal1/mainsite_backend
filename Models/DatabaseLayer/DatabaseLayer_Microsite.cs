@@ -80,6 +80,43 @@ CREATE TABLE IF NOT EXISTS assign_product (
             await cmd.ExecuteNonQueryAsync();
         }
 
+        /// <summary>Ensures microsites.url exists and backfills missing values from unique_id.</summary>
+        private async Task EnsureMicrositeUrlColumn(NpgsqlConnection conn, NpgsqlTransaction? transaction = null)
+        {
+            const string alterSql = "ALTER TABLE microsites ADD COLUMN IF NOT EXISTS url TEXT;";
+            using (var alterCmd = new NpgsqlCommand(alterSql, conn, transaction))
+                await alterCmd.ExecuteNonQueryAsync();
+
+            const string selectSql = @"
+SELECT id, unique_id::text
+FROM microsites
+WHERE url IS NULL OR TRIM(url) = ''";
+
+            var rowsToBackfill = new List<(long Id, string UniqueId)>();
+            using (var selectCmd = new NpgsqlCommand(selectSql, conn, transaction))
+            using (var reader = await selectCmd.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    var uid = reader["unique_id"]?.ToString();
+                    if (string.IsNullOrWhiteSpace(uid))
+                        continue;
+                    rowsToBackfill.Add((reader.GetInt64(0), uid));
+                }
+            }
+
+            foreach (var (id, uniqueId) in rowsToBackfill)
+            {
+                var generatedUrl = BuildMicrositeRuntimeUrl(uniqueId.Replace("-", ""), null);
+                using var updateCmd = new NpgsqlCommand(
+                    "UPDATE microsites SET url = @url WHERE id = @id",
+                    conn, transaction);
+                updateCmd.Parameters.AddWithValue("@url", generatedUrl);
+                updateCmd.Parameters.AddWithValue("@id", id);
+                await updateCmd.ExecuteNonQueryAsync();
+            }
+        }
+
         public async Task<List<MicrositeModel>> GetMicrosite()
         {
 
@@ -455,34 +492,15 @@ CREATE TABLE IF NOT EXISTS assign_product (
 
             try
             {
-                // Use deterministic UUID and generated microsite URL for this project format.
+                await EnsureMicrositeUrlColumn(conn, transaction);
+
+                // Generate unique id and public URL, then persist URL in microsites first.
                 var micrositeUniqueId = Guid.NewGuid();
                 var uniqueIdText = micrositeUniqueId.ToString("N");
                 model.UniqueId = uniqueIdText;
                 model.Url = BuildMicrositeRuntimeUrl(uniqueIdText, null);
 
-                // ================= IMAGE UPLOAD (S3) =================
-
-                // LOGO
-                if (model.LogoFile != null && model.LogoFile.Length > 0)
-                {
-                    model.LogoImage = await S3StorageHelper.UploadFileAsync(model.LogoFile, "microsites/logo");
-                }
-
-                // BANNER
-                if (model.BannerFile != null && model.BannerFile.Length > 0)
-                {
-                    model.BannerImage = await S3StorageHelper.UploadFileAsync(model.BannerFile, "microsites/banner");
-                }
-
-                // FAVICON
-                if (model.FaviconFile != null && model.FaviconFile.Length > 0)
-                {
-                    model.Favicon = await S3StorageHelper.UploadFileAsync(model.FaviconFile, "microsites/favicon");
-                }
-                // ================= INSERT MICROSITE =================
-
-                string sql = @"INSERT INTO microsites
+                string insertSql = @"INSERT INTO microsites
                 (name,slug,heading,content,address,email,mobile,
                 logo_image,banner_image,favicon,
                 unique_id,start_date,end_date,status,url)
@@ -492,32 +510,61 @@ CREATE TABLE IF NOT EXISTS assign_product (
                 @unique_id,@start,@end,@status,@url)
                 RETURNING id, unique_id::text, url";
 
-                using var cmd = new NpgsqlCommand(sql, conn, transaction);
+                using var insertCmd = new NpgsqlCommand(insertSql, conn, transaction);
 
-                cmd.Parameters.AddWithValue("@name", model.Name ?? "");
-                cmd.Parameters.AddWithValue("@slug", model.Slug ?? "");
-                cmd.Parameters.AddWithValue("@heading", model.Heading ?? "");
-                cmd.Parameters.AddWithValue("@content", model.Content ?? "");
-                cmd.Parameters.AddWithValue("@address", model.Address ?? "");
-                cmd.Parameters.AddWithValue("@email", model.Email ?? "");
-                cmd.Parameters.AddWithValue("@mobile", model.Mobile ?? "");
-                cmd.Parameters.AddWithValue("@logo", model.LogoImage ?? "");
-                cmd.Parameters.AddWithValue("@banner", model.BannerImage ?? "");
-                cmd.Parameters.AddWithValue("@favicon", model.Favicon ?? "");
-                cmd.Parameters.AddWithValue("@unique_id", micrositeUniqueId);
-                cmd.Parameters.AddWithValue("@start", model.StartDate ?? (object)DBNull.Value);
-                cmd.Parameters.AddWithValue("@end", model.EndDate ?? (object)DBNull.Value);
-                cmd.Parameters.AddWithValue("@status", model.Status);
-                cmd.Parameters.AddWithValue("@url", model.Url ?? "");
+                insertCmd.Parameters.AddWithValue("@name", model.Name ?? "");
+                insertCmd.Parameters.AddWithValue("@slug", model.Slug ?? "");
+                insertCmd.Parameters.AddWithValue("@heading", model.Heading ?? "");
+                insertCmd.Parameters.AddWithValue("@content", model.Content ?? "");
+                insertCmd.Parameters.AddWithValue("@address", model.Address ?? "");
+                insertCmd.Parameters.AddWithValue("@email", model.Email ?? "");
+                insertCmd.Parameters.AddWithValue("@mobile", model.Mobile ?? "");
+                insertCmd.Parameters.AddWithValue("@logo", "");
+                insertCmd.Parameters.AddWithValue("@banner", "");
+                insertCmd.Parameters.AddWithValue("@favicon", "");
+                insertCmd.Parameters.AddWithValue("@unique_id", micrositeUniqueId);
+                insertCmd.Parameters.AddWithValue("@start", model.StartDate ?? (object)DBNull.Value);
+                insertCmd.Parameters.AddWithValue("@end", model.EndDate ?? (object)DBNull.Value);
+                insertCmd.Parameters.AddWithValue("@status", model.Status);
+                insertCmd.Parameters.AddWithValue("@url", model.Url ?? "");
 
                 long micrositeId;
 
-                using (var insertReader = await cmd.ExecuteReaderAsync())
+                using (var insertReader = await insertCmd.ExecuteReaderAsync())
                 {
                     await insertReader.ReadAsync();
                     micrositeId = insertReader.GetInt64(0);
                     model.UniqueId = insertReader.GetString(1).Replace("-", "");
                     model.Url = insertReader.GetString(2);
+                }
+
+                // ================= IMAGE UPLOAD (S3) =================
+
+                if (model.LogoFile != null && model.LogoFile.Length > 0)
+                    model.LogoImage = await S3StorageHelper.UploadFileAsync(model.LogoFile, "microsites/logo");
+
+                if (model.BannerFile != null && model.BannerFile.Length > 0)
+                    model.BannerImage = await S3StorageHelper.UploadFileAsync(model.BannerFile, "microsites/banner");
+
+                if (model.FaviconFile != null && model.FaviconFile.Length > 0)
+                    model.Favicon = await S3StorageHelper.UploadFileAsync(model.FaviconFile, "microsites/favicon");
+
+                if (!string.IsNullOrWhiteSpace(model.LogoImage) ||
+                    !string.IsNullOrWhiteSpace(model.BannerImage) ||
+                    !string.IsNullOrWhiteSpace(model.Favicon))
+                {
+                    const string imageSql = @"UPDATE microsites
+                        SET logo_image = COALESCE(NULLIF(@logo, ''), logo_image),
+                            banner_image = COALESCE(NULLIF(@banner, ''), banner_image),
+                            favicon = COALESCE(NULLIF(@favicon, ''), favicon)
+                        WHERE id = @id";
+
+                    using var imageCmd = new NpgsqlCommand(imageSql, conn, transaction);
+                    imageCmd.Parameters.AddWithValue("@id", micrositeId);
+                    imageCmd.Parameters.AddWithValue("@logo", model.LogoImage ?? "");
+                    imageCmd.Parameters.AddWithValue("@banner", model.BannerImage ?? "");
+                    imageCmd.Parameters.AddWithValue("@favicon", model.Favicon ?? "");
+                    await imageCmd.ExecuteNonQueryAsync();
                 }
 
                 // ================= DOMAINS =================
@@ -757,6 +804,8 @@ CREATE TABLE IF NOT EXISTS assign_product (
 
             try
             {
+                await EnsureMicrositeUrlColumn(conn, transaction);
+
                 // ================= CHECK EXIST =================
                 var checkCmd = new NpgsqlCommand("SELECT COUNT(1) FROM microsites WHERE id=@id", conn, transaction);
                 checkCmd.Parameters.AddWithValue("@id", id);
@@ -812,7 +861,8 @@ CREATE TABLE IF NOT EXISTS assign_product (
             favicon = @favicon,
             start_date = @start,
             end_date = @end,
-            status = @status
+            status = @status,
+            url = COALESCE(@url, url)
         WHERE id=@id";
 
                 using (var updateCmd = new NpgsqlCommand(updateSql, conn, transaction))
@@ -830,6 +880,9 @@ CREATE TABLE IF NOT EXISTS assign_product (
                     updateCmd.Parameters.AddWithValue("@start", model.StartDate ?? (object)DBNull.Value);
                     updateCmd.Parameters.AddWithValue("@end", model.EndDate ?? (object)DBNull.Value);
                     updateCmd.Parameters.AddWithValue("@status", model.Status);
+                    updateCmd.Parameters.AddWithValue(
+                        "@url",
+                        string.IsNullOrWhiteSpace(model.Url) ? DBNull.Value : model.Url.Trim());
 
                     var rows = await updateCmd.ExecuteNonQueryAsync();
                     if (rows == 0)
@@ -946,10 +999,11 @@ CREATE TABLE IF NOT EXISTS assign_product (
 
         private string BuildMicrositeRuntimeUrl(string? uniqueId, string? dbUrl)
         {
+            if (!string.IsNullOrWhiteSpace(dbUrl))
+                return dbUrl.Trim();
+
             if (string.IsNullOrWhiteSpace(uniqueId))
-            {
-                return dbUrl ?? string.Empty;
-            }
+                return string.Empty;
 
             var micrositeBaseUrl = _configuration["MicrositePublicBaseUrl"];
             if (string.IsNullOrWhiteSpace(micrositeBaseUrl))

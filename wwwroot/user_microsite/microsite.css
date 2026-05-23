@@ -1,0 +1,29 @@
+/* Microsite featured products — Bootstrap grid, no carousel */
+.ms-featured .products .row {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.ms-featured .products .row > [class*="col-"] {
+  margin-bottom: 2rem;
+}
+
+.ms-featured .owl-carousel,
+.ms-featured .owl-nav,
+.ms-featured .owl-dots {
+  display: none !important;
+}
+
+.product-action-vertical .btn-wishlist,
+.product-action-vertical .btn-quickview {
+  display: none !important;
+}
+
+.ms-welcome-box {
+  background: #fff;
+  border-radius: 8px;
+  padding: 2rem;
+  text-align: center;
+  max-width: 720px;
+  margin: 0 auto;
+}
