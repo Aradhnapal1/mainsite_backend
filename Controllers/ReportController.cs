@@ -23,10 +23,7 @@ namespace firstproject.Controllers
             {
                 status = true,
                 message = "Report fetched successfully",
-                data = new
-                {
-                    totalUsers = result
-                }
+                data = result
             };
 
             return Ok(response);
