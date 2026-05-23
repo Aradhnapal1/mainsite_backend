@@ -13,7 +13,14 @@
     }
 
     function getPageExt() {
-        return (window.location.pathname || "").toLowerCase().indexOf(".php") >= 0 ? ".php" : ".html";
+        return ".html";
+    }
+
+    function pageUrl(name, extra) {
+        if (typeof window.msPageUrl === "function") {
+            return window.msPageUrl(name, extra);
+        }
+        return name + ".html" + getContextQuery(extra);
     }
 
     function getContextQuery(extra) {
@@ -34,7 +41,7 @@
     }
 
     function getApiBase() {
-        var base = window.MICROSITE_API_BASE || window.location.origin || "";
+        var base = window.MICROSITE_API_BASE || window.API_BASE || window.domain || "http://microsite_backend.workarya.com";
         return String(base).replace(/\/$/, "");
     }
 
@@ -83,9 +90,9 @@
         if (!items.length) return { ok: true };
         var existing = items[0];
         if (String(existing.id) === String(productId)) {
-            return { ok: false, message: "Ye product pehle se cart me hai. Sirf 1 product allow hai." };
+            return { ok: false, message: "This product is already in your cart. Only one product is allowed." };
         }
-        return { ok: false, message: "Microsite me sirf 1 product cart me ho sakta hai. Pehle remove karein." };
+        return { ok: false, message: "Only one product can be in the cart. Remove the current item first." };
     }
 
     function updateCartBadge() {
@@ -122,7 +129,7 @@
         if (!login || !register) return;
         if (auth && auth.token) {
             login.textContent = auth.user && auth.user.email ? auth.user.email : "Account";
-            login.href = "order.php" + getContextQuery();
+            login.href = pageUrl("order");
             register.textContent = "Logout";
             register.href = "#";
             register.onclick = function (e) {
@@ -135,9 +142,9 @@
             };
         } else {
             login.textContent = "Login";
-            login.href = "login" + getPageExt() + getContextQuery();
+            login.href = pageUrl("login");
             register.textContent = "Register";
-            register.href = "register" + getPageExt() + getContextQuery();
+            register.href = pageUrl("register");
             register.onclick = null;
         }
     }
@@ -193,7 +200,7 @@
     }
 
     function getProductDetailUrl(productId) {
-        return "product" + getPageExt() + getContextQuery({ id: productId });
+        return pageUrl("product", { id: productId });
     }
 
     async function sendOtp(email, name) {
@@ -237,13 +244,13 @@
         sendBtn.addEventListener("click", async function () {
             var email = (emailEl.value || "").trim();
             if (!email) {
-                iziToast.warning({ title: "Email", message: "Email enter karein.", position: "topRight" });
+                iziToast.warning({ title: "Email", message: "Please enter your email.", position: "topRight" });
                 return;
             }
             if (!getContext().micrositeId && !getContext().domain) {
                 iziToast.warning({
                     title: "Microsite",
-                    message: "URL me microsite_id add karein.",
+                    message: "Add microsite_id to the URL.",
                     position: "topRight",
                 });
                 return;
@@ -252,12 +259,12 @@
             try {
                 var name = nameEl ? (nameEl.value || "").trim() : "";
                 if (mode === "register" && !name) {
-                    iziToast.warning({ title: "Name", message: "Register ke liye name required hai.", position: "topRight" });
+                    iziToast.warning({ title: "Name", message: "Name is required to register.", position: "topRight" });
                     return;
                 }
                 var data = await sendOtp(email, name || undefined);
                 if (data.status) {
-                    iziToast.success({ title: "OTP", message: data.message || "OTP bhej diya.", position: "topRight" });
+                    iziToast.success({ title: "OTP", message: data.message || "OTP sent successfully.", position: "topRight" });
                 } else {
                     iziToast.error({ title: "OTP", message: data.message || "OTP send fail.", position: "topRight" });
                 }
@@ -273,11 +280,11 @@
             var otp = (otpEl && otpEl.value ? otpEl.value : "").trim();
             var name = nameEl ? (nameEl.value || "").trim() : "";
             if (!email || !otp) {
-                iziToast.warning({ title: "Verify", message: "Email aur OTP required.", position: "topRight" });
+                iziToast.warning({ title: "Verify", message: "Email and OTP are required.", position: "topRight" });
                 return;
             }
             if (mode === "register" && !name) {
-                iziToast.warning({ title: "Name", message: "Name required hai.", position: "topRight" });
+                iziToast.warning({ title: "Name", message: "Name is required.", position: "topRight" });
                 return;
             }
             verifyBtn.disabled = true;
@@ -290,7 +297,7 @@
                         message: data.message || "Login successful.",
                         position: "topRight",
                     });
-                    window.location.href = "index" + getPageExt() + getContextQuery();
+                    window.location.href = pageUrl("index");
                 } else {
                     iziToast.error({ title: "Verify", message: data.message || "OTP invalid.", position: "topRight" });
                 }
@@ -422,7 +429,7 @@
 
         var cart = getCart();
         if (!cart.length) {
-            if (hint) hint.textContent = "Cart empty hai. Pehle 1 product add karein.";
+            if (hint) hint.textContent = "Your cart is empty. Add a product first.";
             btn.disabled = true;
             return;
         }
@@ -436,7 +443,7 @@
 
         var auth = getAuth();
         if (!auth || !auth.token) {
-            if (hint) hint.textContent = "Order ke liye pehle login karein.";
+            if (hint) hint.textContent = "Please sign in before placing an order.";
             btn.disabled = true;
             return;
         }
@@ -461,11 +468,11 @@
             };
 
             if (!body.firstName || !body.email || !body.address) {
-                iziToast.warning({ title: "Checkout", message: "Required fields fill karein.", position: "topRight" });
+                iziToast.warning({ title: "Checkout", message: "Please fill in all required fields.", position: "topRight" });
                 return;
             }
             if (!body.micrositeId && !body.domain) {
-                iziToast.warning({ title: "Checkout", message: "microsite_id URL me missing hai.", position: "topRight" });
+                iziToast.warning({ title: "Checkout", message: "microsite_id is missing from the URL.", position: "topRight" });
                 return;
             }
 
@@ -483,7 +490,7 @@
                 if (data.status) {
                     saveCart([]);
                     iziToast.success({ title: "Order", message: data.message || "Order placed.", position: "topRight" });
-                    window.location.href = "order" + getPageExt() + getContextQuery();
+                    window.location.href = pageUrl("order");
                 } else {
                     iziToast.error({ title: "Order", message: data.message || "Order failed.", position: "topRight" });
                 }

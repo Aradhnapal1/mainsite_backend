@@ -1,5 +1,4 @@
-(function () {
-    var API_BASE = window.MICROSITE_API_BASE || window.API_BASE || window.domain || "http://microsite_backend.workarya.com";
+﻿    var API_BASE = window.MICROSITE_API_BASE || window.API_BASE || window.domain || "http://microsite_backend.workarya.com";
 
     function safeText(value, fallback) {
         if (value === null || value === undefined || value === "") {
@@ -91,25 +90,11 @@
 
     function micrositeFromPayload(payload) {
         if (!payload) return null;
-        if (payload.data && payload.data.id) return payload.data;
-        if (payload.data && !Array.isArray(payload.data)) return payload.data;
-        if (Array.isArray(payload) && payload.length > 0) return payload[0];
-        if (payload.id) return payload;
-        return null;
-    }
-
-    function extractProducts(payload) {
-        if (!payload) return [];
-        if (Array.isArray(payload.products)) return payload.products;
-        if (Array.isArray(payload.assignedProducts)) return payload.assignedProducts;
-        if (payload.data && Array.isArray(payload.data.assignedProducts)) return payload.data.assignedProducts;
-        if (payload.data && Array.isArray(payload.data.products)) return payload.data.products;
-        if (Array.isArray(payload.data) && payload.data.length && payload.data[0].productId) return payload.data;
         return [];
     }
 
     function getApiBase() {
-        var base = window.MICROSITE_API_BASE || window.location.origin || "";
+        var base = window.MICROSITE_API_BASE || window.API_BASE || window.domain || "http://microsite_backend.workarya.com";
         return String(base).replace(/\/$/, "");
     }
 
@@ -137,7 +122,6 @@
     }
 
     async function fetchMicrositeBundle(context) {
-        var micrositeId = context && context.micrositeId ? context.micrositeId : "";
         var slug = context && context.slug ? context.slug : "";
         var domain = context && context.domain ? context.domain : "";
 
@@ -160,7 +144,6 @@
                 if (!res.ok) continue;
                 var data = await res.json();
                 var microsite = micrositeFromPayload(data);
-                if (!microsite || !microsite.id) continue;
 
                 var products = extractProducts(data);
                 if (!products.length && micrositeId) {
@@ -179,16 +162,6 @@
     }
 
     async function fetchProductsFallback(micrositeId) {
-        try {
-            var res = await fetch(
-                API_BASE + "/api/microsite-public/products-by-id?microsite_id=" + encodeURIComponent(micrositeId)
-            );
-            if (!res.ok) return [];
-            var data = await res.json();
-            return extractProducts(data);
-        } catch (e) {
-            return [];
-        }
     }
 
     async function fetchProductsByDomain(domain) {
@@ -290,9 +263,7 @@
     }
 
     function getIndexPage() {
-        return (window.location.pathname || "").toLowerCase().indexOf(".php") >= 0
-            ? "index.php"
-            : "index.html";
+        return "index.html";
     }
 
     function escapeHtml(text) {
@@ -358,10 +329,6 @@
             '" class="product-image grid-product-image">' +
             hoverHtml +
             "</a>" +
-            '<div class="product-action-vertical">' +
-            '<a href="#" class="btn-product-icon btn-wishlist btn-expandable"><span>add to wishlist</span></a>' +
-            '<a href="#" class="btn-product-icon btn-quickview" title="Quick view"><span>Quick view</span></a>' +
-            "</div>" +
             '<div class="product-action">' +
             '<a href="#" class="btn-product btn-cart" data-id="' +
             id +
@@ -383,7 +350,8 @@
             (thumbHtml ? '<div class="product-nav product-nav-thumbs mt-1">' + thumbHtml + "</div>" : "") +
             "</div></div>";
 
-        return '<div class="ms-product-slide">' + innerHTML + "</div>";
+        var colClass = wrapperClass || "col-sm-3 col-md-3 col-lg-3";
+        return '<div class="' + colClass + '">' + innerHTML + "</div>";
     }
 
     function bindProductCardEvents(root) {
@@ -433,109 +401,17 @@
         if (emptyEl) emptyEl.style.display = "none";
         if (sectionEl) sectionEl.style.display = "block";
 
-        container.className = "ms-products-track";
+        container.className = "row g-3 justify-content-center";
         container.style.transform = "";
 
         products.forEach(function (p) {
-            container.insertAdjacentHTML("beforeend", getMainsiteProductCardHTML(p));
+            container.insertAdjacentHTML(
+                "beforeend",
+                getMainsiteProductCardHTML(p, "col-6 col-sm-3 col-md-3 col-lg-3")
+            );
         });
 
         bindProductCardEvents(container);
-        initProductCarousel(products.length);
-    }
-
-    function getItemsPerPage() {
-        var w = window.innerWidth || 1200;
-        if (w < 576) return 1;
-        if (w < 768) return 2;
-        if (w < 992) return 3;
-        if (w < 1200) return 4;
-        return 5;
-    }
-
-    function initProductCarousel(totalProducts) {
-        var track = document.getElementById("msProducts");
-        var viewport = track ? track.parentElement : null;
-        var prevBtn = document.getElementById("msCarouselPrev");
-        var nextBtn = document.getElementById("msCarouselNext");
-        var dotsWrap = document.getElementById("msCarouselDots");
-        if (!track || !viewport) return;
-
-        var state = { page: 0, perPage: getItemsPerPage(), total: totalProducts };
-
-        function totalPages() {
-            return Math.max(1, Math.ceil(state.total / state.perPage));
-        }
-
-        function updateLayout() {
-            state.perPage = getItemsPerPage();
-            var pages = totalPages();
-            if (state.page >= pages) state.page = pages - 1;
-
-            var slideBasis = 100 / state.perPage;
-            track.querySelectorAll(".ms-product-slide").forEach(function (slide) {
-                slide.style.flex = "0 0 " + slideBasis + "%";
-                slide.style.maxWidth = slideBasis + "%";
-            });
-
-            var offset = state.page * 100;
-            track.style.transform = "translate3d(-" + offset + "%, 0, 0)";
-
-            if (prevBtn) prevBtn.disabled = state.page <= 0;
-            if (nextBtn) nextBtn.disabled = state.page >= pages - 1;
-
-            if (dotsWrap) {
-                dotsWrap.innerHTML = "";
-                if (pages > 1) {
-                    for (var i = 0; i < pages; i++) {
-                        var dot = document.createElement("button");
-                        dot.type = "button";
-                        dot.className = "ms-carousel-dot" + (i === state.page ? " active" : "");
-                        dot.setAttribute("aria-label", "Page " + (i + 1));
-                        dot.addEventListener(
-                            "click",
-                            (function (idx) {
-                                return function () {
-                                    state.page = idx;
-                                    updateLayout();
-                                };
-                            })(i)
-                        );
-                        dotsWrap.appendChild(dot);
-                    }
-                    dotsWrap.style.display = "flex";
-                } else {
-                    dotsWrap.style.display = "none";
-                }
-            }
-
-            var showNav = state.total > state.perPage;
-            if (prevBtn) prevBtn.style.display = showNav ? "" : "none";
-            if (nextBtn) nextBtn.style.display = showNav ? "" : "none";
-        }
-
-        if (prevBtn) {
-            prevBtn.onclick = function () {
-                if (state.page > 0) {
-                    state.page -= 1;
-                    updateLayout();
-                }
-            };
-        }
-        if (nextBtn) {
-            nextBtn.onclick = function () {
-                if (state.page < totalPages() - 1) {
-                    state.page += 1;
-                    updateLayout();
-                }
-            };
-        }
-
-        window.addEventListener("resize", function () {
-            updateLayout();
-        });
-
-        updateLayout();
     }
 
     function preserveContextLinks(context) {
@@ -567,7 +443,7 @@
             if (document.getElementById("msProducts") && window.iziToast) {
                 iziToast.warning({
                     title: "Microsite",
-                    message: "Microsite data load nahi hui. URL me microsite_id check karein.",
+                    message: "Could not load microsite data. Check microsite_id in the URL.",
                     position: "topRight",
                 });
             }

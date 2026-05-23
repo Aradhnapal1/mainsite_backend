@@ -1,10 +1,18 @@
-﻿<!DOCTYPE html>
+﻿<?php
+if (!isset($pageTitle)) {
+    $pageTitle = 'Microsite';
+}
+if (!isset($currentPage)) {
+    $currentPage = 'home';
+}
+?>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>Orders</title>
+    <title><?php echo htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8'); ?></title>
     <meta name="description" content="Microsite page">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/css/style.css">
@@ -14,7 +22,8 @@
     <script src="microsite-config.js"></script>
     <script src="_microsite-shell.js"></script>
 </head>
-<body data-ms-page="order"><header class="ms-header py-3 mb-4">
+<body data-ms-page="<?php echo htmlspecialchars($currentPage, ENT_QUOTES, 'UTF-8'); ?>">
+<header class="ms-header py-3 mb-4">
     <div class="container d-flex justify-content-between align-items-center flex-wrap gap-2">
         <a href="#" data-ms-nav="index" class="text-decoration-none d-flex align-items-center text-reset ms-nav-home">
             <img id="msLogo" class="ms-logo me-2" src="" alt="Logo" style="display:none;">
@@ -35,41 +44,3 @@
     </div>
 </header>
 <main class="container pb-5">
-
-<section class="card p-4 shadow-sm">
-    <h2 class="mb-3">Order Page</h2>
-    <table class="table">
-        <thead><tr><th>Order ID</th><th>Status</th><th>Total</th><th>Action</th></tr></thead>
-        <tbody>
-            <tr>
-                <td>#1001</td><td>Placed</td><td>Rs. 0.00</td>
-                <td><a class="btn btn-sm ms-btn" href="#" data-ms-href="order-details">View Details</a></td>
-            </tr>
-        </tbody>
-    </table>
-</section>
-</main>
-<footer class="ms-footer py-4 mt-4">
-    <div class="container">
-        <div class="row g-3">
-            <div class="col-md-4">
-                <h5 class="mb-1" id="msFooterName">Microsite</h5>
-                <p class="mb-0" id="msFooterContent">Dynamic microsite footer content will show here.</p>
-            </div>
-            <div class="col-md-4">
-                <p class="mb-1"><strong>Address:</strong> <span id="msAddress">-</span></p>
-                <p class="mb-1"><strong>Email:</strong> <span id="msEmail">-</span></p>
-                <p class="mb-0"><strong>Mobile:</strong> <span id="msMobile">-</span></p>
-            </div>
-            <div class="col-md-4 text-md-end">
-                <small id="msDateRange">Validity: -</small>
-            </div>
-        </div>
-    </div>
-</footer>
-<script src="https://cdn.jsdelivr.net/npm/izitoast/dist/js/iziToast.min.js"></script>
-<script src="_microsite-app.js"></script>
-<script src="_runtime.js"></script>
-</body>
-</html>
-
