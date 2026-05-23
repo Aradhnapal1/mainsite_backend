@@ -4,6 +4,11 @@ body {
     font-family: var(--ms-font-family, inherit);
     color: #212529;
 }
+body.ms-no-hover .ms-btn:hover {
+    opacity: 1;
+    color: var(--ms-button-text-color);
+    background: var(--ms-button-color);
+}
 .ms-header {
     background: var(--ms-header-color);
     color: var(--ms-text-color);
@@ -35,14 +40,32 @@ body {
     object-fit: cover;
     border-radius: 10px;
 }
+.ms-header-inner {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: nowrap;
+}
+
+.ms-nav-home {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
 .ms-header-nav {
     align-items: center;
+    gap: 1rem;
+    margin-left: auto;
+    flex: 0 0 auto;
 }
+
 .ms-header-nav a {
     text-decoration: none;
+    white-space: nowrap;
 }
+
 .ms-header-nav a:hover {
-    opacity: 0.85;
+    opacity: 1;
 }
 .ms-cart-link {
     position: relative;
@@ -76,16 +99,95 @@ body {
     border-radius: 12px;
 }
 
+.ms-nav-offcanvas {
+    width: 50% !important;
+    max-width: 50vw;
+    background-color: var(--ms-header-color, #151d2e) !important;
+    color: var(--ms-text-color, #fff);
+}
+
+.ms-nav-offcanvas .offcanvas-title,
+.ms-nav-offcanvas .nav-link,
+.ms-nav-offcanvas .btn-close {
+    color: var(--ms-text-color, #fff);
+}
+
+.ms-nav-offcanvas .btn-close {
+    filter: invert(1) grayscale(100%);
+    opacity: 0.85;
+}
+
+.ms-offcanvas-nav .nav-link {
+    font-size: 1.05rem;
+}
+
+.ms-menu-toggle {
+    background: transparent;
+    border: none;
+    padding: 0.4rem;
+    display: inline-flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 5px;
+    color: var(--ms-text-color, #fff);
+    line-height: 1;
+    width: auto;
+    min-width: 0;
+    flex: 0 0 auto;
+    box-shadow: none;
+}
+
+.ms-menu-toggle:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+.ms-menu-bar {
+    display: block;
+    width: 22px;
+    height: 2px;
+    background: currentColor;
+    border-radius: 1px;
+}
+
+.ms-header-tools {
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 0 0 auto;
+    margin-left: auto;
+}
+
+.ms-cart-link--mobile .ms-cart-badge {
+    right: -8px;
+}
+
 @media (max-width: 767.98px) {
-    .ms-header .container {
-        flex-direction: column;
-        align-items: flex-start !important;
+    .ms-header-nav--desktop {
+        display: none !important;
+        visibility: hidden !important;
+        width: 0 !important;
+        height: 0 !important;
+        overflow: hidden !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        position: absolute !important;
+        pointer-events: none !important;
     }
-    .ms-header-nav {
-        width: 100%;
-        flex-wrap: wrap;
-        gap: 0.65rem !important;
-        font-size: 0.9rem;
+
+    .ms-header-tools {
+        display: flex !important;
+        flex: 0 0 auto !important;
+        width: auto !important;
+        max-width: none !important;
+        margin-left: auto !important;
+    }
+
+    #msSiteName {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
     .ms-banner {
         max-height: 220px;
@@ -94,6 +196,9 @@ body {
     .ms-logo {
         max-height: 40px;
     }
+    #msSiteName {
+        font-size: 1rem;
+    }
     main.container {
         padding-left: 12px;
         padding-right: 12px;
@@ -101,7 +206,11 @@ body {
 }
 
 @media (min-width: 768px) {
-    .ms-header-nav {
-        gap: 1rem !important;
+    .ms-header-tools {
+        display: none !important;
+    }
+
+    .ms-header-nav--desktop {
+        display: flex !important;
     }
 }

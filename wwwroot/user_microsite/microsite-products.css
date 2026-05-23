@@ -22,8 +22,18 @@
 .ms-carousel-shell,
 .ms-carousel-btn,
 .ms-carousel-dots,
-.ms-products-viewport,
-.ms-products-track {
+.ms-products-viewport {
+    display: none !important;
+}
+
+/* Never hide the featured products grid (old JS used ms-products-track on #msProducts) */
+#msProducts {
+    display: flex !important;
+    flex-wrap: wrap;
+    transform: none !important;
+}
+
+.ms-products-viewport .ms-products-track {
     display: none !important;
 }
 
@@ -60,7 +70,7 @@
 }
 
 .ms-featured-wrap .product:hover {
-    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+    box-shadow: none;
 }
 
 .ms-featured-wrap .product-media {
@@ -90,14 +100,6 @@
     opacity: 0;
 }
 
-.ms-featured-wrap .product-media:hover .product-image {
-    opacity: 0;
-}
-
-.ms-featured-wrap .product-media:hover .product-image-hover {
-    opacity: 1;
-}
-
 .ms-featured-wrap .product-action-vertical,
 .ms-featured-wrap .btn-wishlist,
 .ms-featured-wrap .btn-quickview {
@@ -110,15 +112,9 @@
     right: 0;
     bottom: 0;
     z-index: 2;
-    opacity: 0;
-    visibility: hidden;
-    transition: all 0.35s ease;
-    background-color: rgba(255, 255, 255, 0.95);
-}
-
-.ms-featured-wrap .product:hover .product-action {
     opacity: 1;
     visibility: visible;
+    background-color: rgba(255, 255, 255, 0.95);
 }
 
 .ms-featured-wrap .product.product-7 .btn-product {
@@ -137,8 +133,8 @@
 }
 
 .ms-featured-wrap .product.product-7 .btn-product:hover {
-    color: #fff;
-    background-color: #c96;
+    color: #c96;
+    background-color: #fff;
 }
 
 .ms-featured-wrap .product-body {
@@ -169,17 +165,13 @@
 }
 
 .ms-featured-wrap .product-title a:hover {
-    color: #c96;
+    color: #333;
 }
 
-.ms-featured-wrap .product-price {
-    font-size: 1.6rem;
-    color: #c96;
-    justify-content: center;
-    display: flex;
-    gap: 0.8rem;
-    flex-wrap: wrap;
-    margin-bottom: 0.5rem;
+.ms-featured-wrap .product-price,
+.ms-featured-wrap .product-nav-thumbs,
+.ms-featured-wrap .grid-color-swatch {
+    display: none !important;
 }
 
 .ms-featured-wrap .old-price {
@@ -212,4 +204,27 @@
     padding: 3rem 1rem;
     color: #777;
     font-size: 1.6rem;
+}
+
+.ms-line-thumb {
+    width: 56px;
+    height: 56px;
+    object-fit: contain;
+    border-radius: 6px;
+    background: #fff;
+    border: 1px solid #eee;
+}
+
+.ms-nav-login,
+.ms-nav-logout {
+    font-size: 1.35rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+}
+
+body.ms-no-hover .ms-btn:hover,
+body.ms-no-hover .btn:hover,
+body.ms-no-hover .btn-outline-danger:hover {
+    opacity: 1;
 }

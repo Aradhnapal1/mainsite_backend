@@ -83,10 +83,23 @@
         }
     }
 
+    function formatMicrositeDate(value) {
+        if (value === undefined || value === null || value === "") return "N/A";
+        var str = String(value).trim();
+        if (!str) return "N/A";
+        if (str.indexOf("T") !== -1) return str.split("T")[0];
+        var d = new Date(str);
+        if (!isNaN(d.getTime())) {
+            var y = d.getFullYear();
+            var m = String(d.getMonth() + 1).padStart(2, "0");
+            var day = String(d.getDate()).padStart(2, "0");
+            return y + "-" + m + "-" + day;
+        }
+        return str;
+    }
+
     function buildDateRange(startDate, endDate) {
-        var from = safeText(startDate, "N/A");
-        var to = safeText(endDate, "N/A");
-        return "Validity: " + from + " to " + to;
+        return "Validity: " + formatMicrositeDate(startDate) + " to " + formatMicrositeDate(endDate);
     }
 
     function micrositeFromPayload(payload) {
@@ -113,8 +126,22 @@
         if (payload.data && payload.data.microsite && Array.isArray(payload.data.microsite.assignedProducts)) {
             return payload.data.microsite.assignedProducts;
         }
-        if (Array.isArray(payload.data) && payload.data.length && (payload.data[0].productId || payload.data[0].ProductId)) {
-            return payload.data;
+        if (payload.data && Array.isArray(payload.data) && payload.data.length) {
+            var first = payload.data[0];
+            if (first && (first.productId || first.ProductId || first.productName || first.ProductName)) {
+                return payload.data;
+            }
+        }
+        return [];
+    }
+
+    function productsFromMicrosite(microsite) {
+        if (!microsite) return [];
+        if (Array.isArray(microsite.assignedProducts) && microsite.assignedProducts.length) {
+            return microsite.assignedProducts;
+        }
+        if (Array.isArray(microsite.AssignedProducts) && microsite.AssignedProducts.length) {
+            return microsite.AssignedProducts;
         }
         return [];
     }
@@ -179,6 +206,9 @@
                 if (!isValidMicrosite(microsite)) continue;
 
                 var products = extractProducts(data);
+                if (!products.length) {
+                    products = productsFromMicrosite(microsite);
+                }
                 if (!products.length && micrositeId) {
                     products = await fetchProductsFallback(micrositeId);
                 }
@@ -222,6 +252,12 @@
 
     function bindMicrosite(m) {
         if (!m) return;
+
+        var domains = m.domains || m.Domains || [];
+        if (domains.length && window.MICROSITE_CONTEXT && !window.MICROSITE_CONTEXT.domain) {
+            window.MICROSITE_CONTEXT.domain = domains[0];
+        }
+        window.__MS_MICROSITE_DOMAINS = domains;
 
         var name = safeText(m.name, "Microsite");
         setText("msSiteName", name, "Microsite");
@@ -306,9 +342,7 @@
     }
 
     function getIndexPage() {
-        return (window.location.pathname || "").toLowerCase().indexOf(".php") >= 0
-            ? "index.php"
-            : "index.html";
+        return "index.html";
     }
 
     function escapeHtml(text) {
@@ -320,6 +354,7 @@
     }
 
     function getMainsiteProductCardHTML(p, wrapperClass) {
+        var colClass = wrapperClass || "col-6 col-md-3";
         var id = p.productId || p.ProductId || p.id || p.Id;
         var name = getProductName(p);
         var category = p.categoryName || p.CategoryName || p.brandName || p.BrandName || "Product";
@@ -340,27 +375,6 @@
             : "";
         var indexPage = getIndexPage();
 
-        var hoverHtml = hoverImg
-            ? '<img src="' + hoverImg + '" alt="' + escapeHtml(name) + '" class="product-image-hover grid-product-image-hover">'
-            : "";
-
-        var thumbHtml = "";
-        images.slice(0, 4).forEach(function (img, i) {
-            var nextHover = images[i + 1] || img;
-            thumbHtml +=
-                '<a href="#" class="grid-color-swatch ' +
-                (i === 0 ? "active" : "") +
-                '" data-img="' +
-                img +
-                '" data-hover-img="' +
-                nextHover +
-                '" data-price-html="' +
-                escapeHtml(priceHtml) +
-                '" data-name="' +
-                escapeHtml(name) +
-                '"><span style="background:#e5e5e5"></span></a>';
-        });
-
         var innerHTML =
             '<div class="product product-7 text-center">' +
             '<figure class="product-media">' +
@@ -372,12 +386,7 @@
             '" alt="' +
             escapeHtml(name) +
             '" class="product-image grid-product-image">' +
-            hoverHtml +
             "</a>" +
-            '<div class="product-action-vertical">' +
-            '<a href="#" class="btn-product-icon btn-wishlist btn-expandable"><span>add to wishlist</span></a>' +
-            '<a href="#" class="btn-product-icon btn-quickview" title="Quick view"><span>Quick view</span></a>' +
-            "</div>" +
             '<div class="product-action">' +
             '<a href="#" class="btn-product btn-cart" data-id="' +
             id +
@@ -393,13 +402,9 @@
             '" class="grid-product-title">' +
             escapeHtml(name) +
             "</a></h3>" +
-            '<div class="product-price grid-product-price">' +
-            priceHtml +
-            "</div>" +
-            (thumbHtml ? '<div class="product-nav product-nav-thumbs mt-1">' + thumbHtml + "</div>" : "") +
             "</div></div>";
 
-        return '<div class="ms-product-slide">' + innerHTML + "</div>";
+        return '<div class="' + colClass + '">' + innerHTML + "</div>";
     }
 
     function bindProductCardEvents(root) {
@@ -449,15 +454,17 @@
         if (emptyEl) emptyEl.style.display = "none";
         if (sectionEl) sectionEl.style.display = "block";
 
-        container.className = "ms-products-track";
+        container.className = "row g-3 justify-content-center";
         container.style.transform = "";
 
         products.forEach(function (p) {
-            container.insertAdjacentHTML("beforeend", getMainsiteProductCardHTML(p));
+            container.insertAdjacentHTML(
+                "beforeend",
+                getMainsiteProductCardHTML(p, "col-6 col-md-3")
+            );
         });
 
         bindProductCardEvents(container);
-        initProductCarousel(products.length);
     }
 
     function getItemsPerPage() {
@@ -562,11 +569,14 @@
         var query = params.toString();
         if (!query) return;
 
-        document.querySelectorAll(".ms-header-nav a, .ms-nav-home").forEach(function (link) {
-            var href = link.getAttribute("href") || getIndexPage();
-            var clean = href.split("?")[0];
-            link.setAttribute("href", clean + "?" + query);
-        });
+        document.querySelectorAll(".ms-header-nav a, .ms-offcanvas-nav a, .ms-nav-home, .ms-cart-link").forEach(
+            function (link) {
+                if (link.classList.contains("ms-nav-logout")) return;
+                var href = link.getAttribute("href") || getIndexPage();
+                var clean = href.split("?")[0];
+                link.setAttribute("href", clean + "?" + query);
+            }
+        );
     }
 
     document.addEventListener("DOMContentLoaded", async function () {

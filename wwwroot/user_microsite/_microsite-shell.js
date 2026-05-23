@@ -2,12 +2,44 @@
  * Microsite context + nav links (.html) with microsite_id / domain / slug in query.
  */
 (function (global) {
+    var STORAGE_ID = "ms_microsite_id";
+    var STORAGE_SLUG = "ms_microsite_slug";
+    var STORAGE_DOMAIN = "ms_microsite_domain";
+
+    function readStored(key) {
+        try {
+            return global.sessionStorage.getItem(key) || "";
+        } catch (e) {
+            return "";
+        }
+    }
+
+    function writeStored(key, value) {
+        if (!value) return;
+        try {
+            global.sessionStorage.setItem(key, value);
+        } catch (e) { /* ignore */ }
+    }
+
     function readContextFromUrl() {
         var params = new URLSearchParams(global.location.search);
+        var micrositeId = params.get("microsite_id") || "";
+        var slug = params.get("slug") || "";
+        var domain = params.get("domain") || "";
+
+        if (micrositeId) writeStored(STORAGE_ID, micrositeId);
+        else micrositeId = readStored(STORAGE_ID);
+
+        if (slug) writeStored(STORAGE_SLUG, slug);
+        else slug = readStored(STORAGE_SLUG);
+
+        if (domain) writeStored(STORAGE_DOMAIN, domain);
+        else domain = readStored(STORAGE_DOMAIN);
+
         return {
-            micrositeId: params.get("microsite_id") || "",
-            slug: params.get("slug") || "",
-            domain: params.get("domain") || "",
+            micrositeId: micrositeId,
+            slug: slug,
+            domain: domain,
             currentPage: (document.body && document.body.getAttribute("data-ms-page")) || ""
         };
     }
@@ -54,7 +86,37 @@
         });
     }
 
+    function syncUrlWithContext() {
+        var ctx = global.MICROSITE_CONTEXT || {};
+        if (!ctx.micrositeId) return;
+        try {
+            var url = new URL(global.location.href);
+            if (url.searchParams.get("microsite_id") === ctx.micrositeId) return;
+            url.searchParams.set("microsite_id", ctx.micrositeId);
+            global.history.replaceState(null, "", url.toString());
+        } catch (e) { /* ignore */ }
+    }
+
+    function ensureMicrositeIdInUrl() {
+        var ctx = global.MICROSITE_CONTEXT || {};
+        if (ctx.micrositeId || ctx.slug || ctx.domain) {
+            syncUrlWithContext();
+            return;
+        }
+
+        var page = (document.body && document.body.getAttribute("data-ms-page")) || "";
+        if (page !== "home") return;
+
+        var defaultId = "f29027c6192d4838823efcc96f837255";
+        try {
+            var url = new URL(global.location.href);
+            url.searchParams.set("microsite_id", defaultId);
+            global.location.replace(url.toString());
+        } catch (e) { /* ignore */ }
+    }
+
     initContext();
+    ensureMicrositeIdInUrl();
 
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", applyNavLinks);

@@ -1,75 +1,18 @@
-﻿<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>Orders</title>
-    <meta name="description" content="Microsite page">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="../assets/css/style.css">
-    <link rel="stylesheet" href="microsite-layout.css">
-    <link rel="stylesheet" href="microsite-products.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/izitoast/dist/css/iziToast.min.css">
-    <script src="microsite-config.js"></script>
-    <script src="_microsite-shell.js"></script>
-</head>
-<body data-ms-page="order"><header class="ms-header py-3 mb-4">
-    <div class="container d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <a href="#" data-ms-nav="index" class="text-decoration-none d-flex align-items-center text-reset ms-nav-home">
-            <img id="msLogo" class="ms-logo me-2" src="" alt="Logo" style="display:none;">
-            <strong id="msSiteName">Microsite</strong>
-        </a>
-        <nav class="d-flex flex-wrap gap-2 gap-md-3 ms-header-nav">
-            <a class="text-reset" href="#" data-ms-nav="index">Home</a>
-            <a class="text-reset" href="#" data-ms-nav="contact">Contact</a>
-            <a class="text-reset" href="#" data-ms-nav="login" id="msNavLogin">Login</a>
-            <a class="text-reset" href="#" data-ms-nav="register" id="msNavRegister">Register</a>
-            <a class="text-reset ms-cart-link" href="#" data-ms-nav="cart" title="Cart" aria-label="Cart">
-                <i class="icon-shopping-cart"></i>
-                <span class="ms-cart-badge" id="msCartBadge">0</span>
-            </a>
-            <a class="text-reset" href="#" data-ms-nav="checkout">Checkout</a>
-            <a class="text-reset" href="#" data-ms-nav="order">Order</a>
-        </nav>
-    </div>
-</header>
-<main class="container pb-5">
+<?php
+$pageTitle = 'Orders';
+$currentPage = 'order';
+require __DIR__ . '/_header.php';
+?>
 
 <section class="card p-4 shadow-sm">
-    <h2 class="mb-3">Order Page</h2>
-    <table class="table">
-        <thead><tr><th>Order ID</th><th>Status</th><th>Total</th><th>Action</th></tr></thead>
-        <tbody>
-            <tr>
-                <td>#1001</td><td>Placed</td><td>Rs. 0.00</td>
-                <td><a class="btn btn-sm ms-btn" href="#" data-ms-href="order-details">View Details</a></td>
-            </tr>
-        </tbody>
-    </table>
-</section>
-</main>
-<footer class="ms-footer py-4 mt-4">
-    <div class="container">
-        <div class="row g-3">
-            <div class="col-md-4">
-                <h5 class="mb-1" id="msFooterName">Microsite</h5>
-                <p class="mb-0" id="msFooterContent">Dynamic microsite footer content will show here.</p>
-            </div>
-            <div class="col-md-4">
-                <p class="mb-1"><strong>Address:</strong> <span id="msAddress">-</span></p>
-                <p class="mb-1"><strong>Email:</strong> <span id="msEmail">-</span></p>
-                <p class="mb-0"><strong>Mobile:</strong> <span id="msMobile">-</span></p>
-            </div>
-            <div class="col-md-4 text-md-end">
-                <small id="msDateRange">Validity: -</small>
-            </div>
-        </div>
+    <h2 class="mb-3">My Orders</h2>
+    <p id="msOrdersEmpty" class="text-muted" style="display:none;">No orders yet.</p>
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead><tr><th></th><th>Order ID</th><th>Product</th><th>Status</th><th>Total</th><th></th></tr></thead>
+            <tbody id="msOrdersBody"></tbody>
+        </table>
     </div>
-</footer>
-<script src="https://cdn.jsdelivr.net/npm/izitoast/dist/js/iziToast.min.js"></script>
-<script src="_microsite-app.js"></script>
-<script src="_runtime.js"></script>
-</body>
-</html>
+</section>
 
+<?php require __DIR__ . '/_footer.php'; ?>

@@ -1,21 +1,45 @@
 <header class="ms-header py-3 mb-4">
-    <div class="container d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div class="container ms-header-inner">
         <a href="#" data-ms-nav="index" class="text-decoration-none d-flex align-items-center text-reset ms-nav-home">
             <img id="msLogo" class="ms-logo me-2" src="" alt="Logo" style="display:none;">
             <strong id="msSiteName">Microsite</strong>
         </a>
-        <nav class="d-flex flex-wrap gap-2 gap-md-3 ms-header-nav">
+        <nav class="ms-header-nav ms-header-nav--desktop d-none d-md-flex align-items-center">
             <a class="text-reset" href="#" data-ms-nav="index">Home</a>
             <a class="text-reset" href="#" data-ms-nav="contact">Contact</a>
-            <a class="text-reset" href="#" data-ms-nav="login" id="msNavLogin">Login</a>
-            <a class="text-reset" href="#" data-ms-nav="register" id="msNavRegister">Register</a>
+            <a class="text-reset ms-nav-login" href="#" data-ms-nav="login" title="Login" aria-label="Login"><i class="icon-user"></i></a>
+            <a class="text-reset ms-nav-orders" href="#" data-ms-nav="order" style="display:none;">Orders</a>
+            <a class="text-reset ms-nav-logout" href="#" title="Logout" aria-label="Logout" style="display:none;"><i class="icon-user"></i></a>
             <a class="text-reset ms-cart-link" href="#" data-ms-nav="cart" title="Cart" aria-label="Cart">
                 <i class="icon-shopping-cart"></i>
                 <span class="ms-cart-badge" id="msCartBadge">0</span>
             </a>
-            <a class="text-reset" href="#" data-ms-nav="checkout">Checkout</a>
-            <a class="text-reset" href="#" data-ms-nav="order">Order</a>
         </nav>
+        <div class="ms-header-tools d-flex d-md-none align-items-center flex-shrink-0">
+            <a class="text-reset ms-cart-link ms-cart-link--mobile" href="#" data-ms-nav="cart" title="Cart" aria-label="Cart">
+                <i class="icon-shopping-cart"></i>
+                <span class="ms-cart-badge">0</span>
+            </a>
+            <button type="button" class="ms-menu-toggle" data-bs-toggle="offcanvas" data-bs-target="#msNavOffcanvas" aria-controls="msNavOffcanvas" aria-label="Open menu">
+                <span class="ms-menu-bar"></span>
+                <span class="ms-menu-bar"></span>
+                <span class="ms-menu-bar"></span>
+            </button>
+        </div>
     </div>
 </header>
-<main class="container pb-5">
+<div class="offcanvas offcanvas-end ms-nav-offcanvas" tabindex="-1" id="msNavOffcanvas" aria-labelledby="msNavOffcanvasLabel">
+    <div class="offcanvas-header border-bottom border-secondary border-opacity-25">
+        <h5 class="offcanvas-title" id="msNavOffcanvasLabel">Menu</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+        <nav class="nav flex-column gap-3 ms-offcanvas-nav">
+            <a class="nav-link text-reset px-0 py-1" href="#" data-ms-nav="index">Home</a>
+            <a class="nav-link text-reset px-0 py-1" href="#" data-ms-nav="contact">Contact</a>
+            <a class="nav-link text-reset px-0 py-1 ms-nav-login" href="#" data-ms-nav="login"><i class="icon-user me-1"></i> Login</a>
+            <a class="nav-link text-reset px-0 py-1 ms-nav-orders" href="#" data-ms-nav="order" style="display:none;">Orders</a>
+            <a class="nav-link text-reset px-0 py-1 ms-nav-logout" href="#" style="display:none;"><i class="icon-user me-1"></i> Logout</a>
+        </nav>
+    </div>
+</div>
