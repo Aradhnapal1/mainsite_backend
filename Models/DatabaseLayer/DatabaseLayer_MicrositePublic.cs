@@ -11,6 +11,7 @@ namespace firstproject.Models.DatabaseLayer
         Task<MicrositeResolvedData?> ResolveMicrositeByUniqueId(string micrositeId);
         Task<MicrositeAssignedProduct?> GetMicrositeProduct(long micrositeId, int productId);
         Task<List<MicrositeAssignedProduct>> GetMicrositeProducts(long micrositeId);
+        Task<List<string>> GetMicrositeDomains(long micrositeId);
         Task<int> CreateMicrositeOtp(long micrositeId, string email, string otp, DateTime expiresAtUtc);
         Task<bool> VerifyMicrositeOtp(long micrositeId, string email, string otp);
         Task<MicrositePublicUser?> GetMicrositeUserByEmail(long micrositeId, string email);
@@ -249,6 +250,24 @@ ORDER BY ap.id DESC;";
                 });
             }
 
+            return list;
+        }
+
+        public async Task<List<string>> GetMicrositeDomains(long micrositeId)
+        {
+            var list = new List<string>();
+            using var connection = new NpgsqlConnection(this.DbConnection);
+            await connection.OpenAsync();
+            const string sql = @"SELECT domain FROM microsite_domains WHERE microsite_id = @mid ORDER BY id;";
+            using var cmd = new NpgsqlCommand(sql, connection);
+            cmd.Parameters.AddWithValue("@mid", micrositeId);
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                var domain = reader["domain"]?.ToString();
+                if (!string.IsNullOrWhiteSpace(domain))
+                    list.Add(domain.Trim());
+            }
             return list;
         }
 

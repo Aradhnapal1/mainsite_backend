@@ -264,11 +264,88 @@
         return pageUrl("product", { id: productId });
     }
 
+    function getAllowedEmailDomains() {
+        var domains = window.__MS_MICROSITE_DOMAINS || [];
+        return domains
+            .map(function (d) {
+                return String(d || "")
+                    .trim()
+                    .toLowerCase()
+                    .replace(/^@/, "");
+            })
+            .filter(Boolean);
+    }
+
+    function isEmailEligibleForMicrosite(email) {
+        var allowed = getAllowedEmailDomains();
+        if (!allowed.length) return { ok: true };
+        var parts = String(email || "")
+            .trim()
+            .toLowerCase()
+            .split("@");
+        if (parts.length < 2) return { ok: false, allowed: allowed };
+        var emailDomain = parts.pop();
+        var match = allowed.some(function (d) {
+            return emailDomain === d || emailDomain.endsWith("." + d);
+        });
+        return match ? { ok: true, allowed: allowed } : { ok: false, allowed: allowed };
+    }
+
+    function updateAuthDomainHint() {
+        var hint = document.getElementById("msAuthDomainHint");
+        if (!hint) return;
+        var allowed = getAllowedEmailDomains();
+        if (!allowed.length) {
+            hint.textContent = "";
+            return;
+        }
+        hint.textContent = "Only @" + allowed.join(", @") + " email addresses can register or login.";
+    }
+
+    async function ensureMicrositeDomains() {
+        if (window.__MS_MICROSITE_DOMAINS && window.__MS_MICROSITE_DOMAINS.length) return window.__MS_MICROSITE_DOMAINS;
+        var ctx = getContext();
+        if (!ctx.micrositeId) return [];
+        try {
+            var res = await fetch(
+                API_BASE + "/api/microsite-public/by-id?microsite_id=" + encodeURIComponent(ctx.micrositeId)
+            );
+            if (!res.ok) return [];
+            var payload = await res.json();
+            var m = payload.data || payload;
+            var domains = m.domains || m.Domains || [];
+            if (domains.length) {
+                window.__MS_MICROSITE_DOMAINS = domains;
+                if (window.MICROSITE_CONTEXT && !window.MICROSITE_CONTEXT.domain) {
+                    window.MICROSITE_CONTEXT.domain = domains[0];
+                }
+            }
+            return domains;
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function showOtpStep() {
+        var otpBlock = document.getElementById("msOtpBlock");
+        var verifyBtn = document.getElementById("msVerifyOtpBtn");
+        var otpEl = document.getElementById("msAuthOtp");
+        if (otpBlock) otpBlock.style.display = "block";
+        if (verifyBtn) verifyBtn.style.display = "";
+        if (otpEl) {
+            otpEl.value = "";
+            otpEl.focus();
+        }
+    }
+
     async function sendOtp(email, name) {
         var ctx = getContext();
-        var body = { email: email };
-        if (ctx.micrositeId) body.micrositeId = ctx.micrositeId;
-        if (ctx.domain) body.domain = ctx.domain;
+        await ensureMicrositeDomains();
+        var body = {
+            email: email,
+            micrositeId: ctx.micrositeId || "",
+            domain: ctx.domain || getDomainForApi() || "",
+        };
         if (name) body.name = name;
 
         var res = await fetch(API_BASE + "/api/microsite-public/auth/send-otp", {
@@ -276,14 +353,29 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
         });
-        return res.json();
+        var data = null;
+        try {
+            data = await res.json();
+        } catch (e) {
+            return { status: false, message: "Invalid server response." };
+        }
+        if (!data) data = { status: false, message: "No response from server." };
+        if (!res.ok && data.status !== true) {
+            data.status = false;
+            data.message = data.message || "Request failed (" + res.status + ").";
+        }
+        return data;
     }
 
     async function verifyOtp(email, otp, name) {
         var ctx = getContext();
-        var body = { email: email, otp: otp };
-        if (ctx.micrositeId) body.micrositeId = ctx.micrositeId;
-        if (ctx.domain) body.domain = ctx.domain;
+        await ensureMicrositeDomains();
+        var body = {
+            email: email,
+            otp: otp,
+            micrositeId: ctx.micrositeId || "",
+            domain: ctx.domain || getDomainForApi() || "",
+        };
         if (name) body.name = name;
 
         var res = await fetch(API_BASE + "/api/microsite-public/auth/verify-otp", {
@@ -291,7 +383,18 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
         });
-        return res.json();
+        var data = null;
+        try {
+            data = await res.json();
+        } catch (e) {
+            return { status: false, message: "Invalid server response." };
+        }
+        if (!data) data = { status: false, message: "No response from server." };
+        if (!res.ok && data.status !== true) {
+            data.status = false;
+            data.message = data.message || "Request failed (" + res.status + ").";
+        }
+        return data;
     }
 
     function initAuthForm(mode) {
@@ -302,8 +405,13 @@
         var verifyBtn = document.getElementById("msVerifyOtpBtn");
         if (!emailEl || !sendBtn || !verifyBtn) return;
 
+        ensureMicrositeDomains().then(function () {
+            updateAuthDomainHint();
+        });
+
         sendBtn.addEventListener("click", async function () {
             var email = (emailEl.value || "").trim();
+            var name = nameEl ? (nameEl.value || "").trim() : "";
             if (!email) {
                 iziToast.warning({ title: "Email", message: "Please enter your email.", position: "topRight" });
                 return;
@@ -316,21 +424,38 @@
                 });
                 return;
             }
+            if (mode === "register" && !name) {
+                iziToast.warning({ title: "Name", message: "Name is required to register.", position: "topRight" });
+                return;
+            }
+
+            await ensureMicrositeDomains();
+            var eligible = isEmailEligibleForMicrosite(email);
+            if (!eligible.ok) {
+                iziToast.error({
+                    title: "Not eligible",
+                    message: "You are not eligible for this microsite.",
+                    position: "topRight",
+                });
+                return;
+            }
+
             sendBtn.disabled = true;
             try {
-                var name = nameEl ? (nameEl.value || "").trim() : "";
-                if (mode === "register" && !name) {
-                    iziToast.warning({ title: "Name", message: "Name is required to register.", position: "topRight" });
-                    return;
-                }
                 var data = await sendOtp(email, name || undefined);
                 if (data.status) {
+                    showOtpStep();
+                    sendBtn.textContent = "Resend OTP";
                     iziToast.success({ title: "OTP", message: data.message || "OTP sent successfully.", position: "topRight" });
                 } else {
-                    iziToast.error({ title: "OTP", message: data.message || "OTP send fail.", position: "topRight" });
+                    iziToast.error({
+                        title: "OTP",
+                        message: data.message || "OTP could not be sent.",
+                        position: "topRight",
+                    });
                 }
             } catch (e) {
-                iziToast.error({ title: "OTP", message: "Server error.", position: "topRight" });
+                iziToast.error({ title: "OTP", message: "Server error. Check API URL or CORS.", position: "topRight" });
             } finally {
                 sendBtn.disabled = false;
             }
@@ -348,6 +473,17 @@
                 iziToast.warning({ title: "Name", message: "Name is required.", position: "topRight" });
                 return;
             }
+
+            var eligible = isEmailEligibleForMicrosite(email);
+            if (!eligible.ok) {
+                iziToast.error({
+                    title: "Not eligible",
+                    message: "You are not eligible for this microsite.",
+                    position: "topRight",
+                });
+                return;
+            }
+
             verifyBtn.disabled = true;
             try {
                 var data = await verifyOtp(email, otp, name || undefined);

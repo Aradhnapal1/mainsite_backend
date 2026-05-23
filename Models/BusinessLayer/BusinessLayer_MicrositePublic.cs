@@ -72,6 +72,37 @@ namespace firstproject.Models.BusinessLayer
             return null;
         }
 
+        private static bool IsEmailEligibleForDomains(string email, List<string> domains)
+        {
+            if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
+                return false;
+            if (domains == null || domains.Count == 0)
+                return false;
+
+            var emailDomain = email.Split('@').Last().Trim().ToLowerInvariant();
+            return domains.Any(d =>
+            {
+                var allowed = (d ?? "").Trim().ToLowerInvariant();
+                if (allowed.StartsWith("@"))
+                    allowed = allowed[1..];
+                return emailDomain == allowed || emailDomain.EndsWith("." + allowed, StringComparison.Ordinal);
+            });
+        }
+
+        private async Task<IActionResult?> ValidateMicrositeEmailDomain(long micrositeId, string email)
+        {
+            var domains = await _databaseLayer.GetMicrositeDomains(micrositeId);
+            if (!IsEmailEligibleForDomains(email, domains))
+            {
+                return new BadRequestObjectResult(new
+                {
+                    status = false,
+                    message = "You are not eligible for this microsite."
+                });
+            }
+            return null;
+        }
+
         public async Task<IActionResult> SendMicrositeOtp(MicrositeOtpSendRequest request)
         {
             await _databaseLayer.EnsureMicrositePublicSchema();
@@ -85,6 +116,10 @@ namespace firstproject.Models.BusinessLayer
             if (microsite == null)
                 return new NotFoundObjectResult(new { status = false, message = "Microsite invalid hai." });
 
+            var domainCheck = await ValidateMicrositeEmailDomain(microsite.MicrositeId, request.Email);
+            if (domainCheck != null)
+                return domainCheck;
+
             var otp = _random.Next(100000, 999999).ToString();
             var expiry = DateTime.UtcNow.AddMinutes(10);
             await _databaseLayer.CreateMicrositeOtp(microsite.MicrositeId, request.Email, otp, expiry);
@@ -96,12 +131,21 @@ namespace firstproject.Models.BusinessLayer
 <p>Valid for 10 minutes.</p>
 <p>Domain: {microsite.Domain}</p>
 </div>";
-            await SendEmailIfConfigured(request.Email, subject, html);
+            var sent = await SendEmailIfConfigured(request.Email, subject, html);
+            if (!sent)
+            {
+                return new ObjectResult(new
+                {
+                    status = false,
+                    message = "OTP email could not be sent. Please check SMTP settings or try again."
+                })
+                { StatusCode = 500 };
+            }
 
             return new OkObjectResult(new
             {
                 status = true,
-                message = "OTP email par bhej diya gaya.",
+                message = "OTP sent to your email.",
                 expiryMinutes = 10
             });
         }
@@ -118,6 +162,10 @@ namespace firstproject.Models.BusinessLayer
             var microsite = await ResolveMicrositeForPublic(request.MicrositeId, request.Domain);
             if (microsite == null)
                 return new NotFoundObjectResult(new { status = false, message = "Microsite invalid hai." });
+
+            var domainCheck = await ValidateMicrositeEmailDomain(microsite.MicrositeId, request.Email);
+            if (domainCheck != null)
+                return domainCheck;
 
             var isValidOtp = await _databaseLayer.VerifyMicrositeOtp(microsite.MicrositeId, request.Email, request.Otp);
             if (!isValidOtp)
@@ -243,18 +291,19 @@ namespace firstproject.Models.BusinessLayer
             return sb.ToString();
         }
 
-        private async Task SendEmailIfConfigured(string toEmail, string subject, string htmlBody)
+        private async Task<bool> SendEmailIfConfigured(string toEmail, string subject, string htmlBody)
         {
             if (string.IsNullOrWhiteSpace(_configuration["Smtp:Host"]))
-                return;
+                return false;
 
             try
             {
                 await SmtpEmailHelper.SendAsync(_configuration, toEmail, subject, htmlBody);
+                return true;
             }
             catch
             {
-                // OTP API still returns success; email failure is logged server-side in hosting logs.
+                return false;
             }
         }
     }
