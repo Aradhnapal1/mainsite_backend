@@ -1,5 +1,5 @@
 (function () {
-    var API_BASE = window.MICROSITE_API_BASE || window.API_BASE || window.domain || "http://microsite_backend.workarya.com";
+    var API_BASE = window.MICROSITE_API_BASE || window.API_BASE || window.domain || "https://microsite-backend.workarya.com";
 
     function getContext() {
         var ctx = window.MICROSITE_CONTEXT || {};
@@ -73,7 +73,7 @@
     }
 
     function getApiBase() {
-        var base = window.MICROSITE_API_BASE || window.API_BASE || window.domain || "http://microsite_backend.workarya.com";
+        var base = window.MICROSITE_API_BASE || window.API_BASE || window.domain || "https://microsite-backend.workarya.com";
         return String(base).replace(/\/$/, "");
     }
 
@@ -122,9 +122,9 @@
         if (!items.length) return { ok: true };
         var existing = items[0];
         if (String(existing.id) === String(productId)) {
-            return { ok: false, message: "This product is already in your cart. Only one product is allowed." };
+            return { ok: false, message: "This product is already in your cart. One order place only." };
         }
-        return { ok: false, message: "Only one product can be in the cart. Remove the current item first." };
+        return { ok: false, message: "One order place only. Remove the current product from cart first." };
     }
 
     function updateCartBadge() {
@@ -188,6 +188,48 @@
         if (auth && auth.token) return auth;
         window.location.href = pageUrl(redirectPage || "login");
         return null;
+    }
+
+    function redirectToLoginWithMessage(message) {
+        if (window.iziToast) {
+            iziToast.warning({
+                title: "Login required",
+                message: message,
+                position: "topRight",
+                timeout: 5000,
+            });
+        }
+        var hint = document.getElementById("msCheckoutHint");
+        if (hint) {
+            hint.className = "alert alert-warning mb-3";
+            hint.textContent = message;
+        }
+        var form = document.getElementById("msCheckoutForm");
+        if (form) form.style.display = "none";
+        var summary = document.getElementById("msCheckoutSummary");
+        if (summary) summary.style.display = "none";
+        var btn = document.getElementById("msPlaceOrderBtn");
+        if (btn) btn.disabled = true;
+        setTimeout(function () {
+            window.location.href = pageUrl("login");
+        }, 2500);
+    }
+
+    async function userHasPlacedOrder() {
+        var auth = getAuth();
+        if (!auth || !auth.token) return false;
+        var domain = getDomainForApi();
+        if (!domain) return false;
+        try {
+            var res = await fetch(
+                API_BASE + "/api/microsite-public/orders?domain=" + encodeURIComponent(domain),
+                { headers: { Authorization: "Bearer " + auth.token } }
+            );
+            var data = await res.json();
+            return !!(data && data.status && (data.totalOrders > 0 || (data.data && data.data.length > 0)));
+        } catch (e) {
+            return false;
+        }
     }
 
     function handleLogout() {
@@ -306,21 +348,33 @@
         return pageUrl("product", { id: productId });
     }
 
+    function normalizeAllowedDomain(d) {
+        var raw = String(d || "")
+            .trim()
+            .toLowerCase()
+            .replace(/^@/, "");
+        if (!raw) return "";
+        if (raw.indexOf("://") >= 0) {
+            try {
+                var u = new URL(raw.indexOf("://") >= 0 ? raw : "https://" + raw);
+                return (u.hostname || raw).toLowerCase();
+            } catch (e) {
+                return raw;
+            }
+        }
+        return raw;
+    }
+
     function getAllowedEmailDomains() {
         var domains = window.__MS_MICROSITE_DOMAINS || [];
-        return domains
-            .map(function (d) {
-                return String(d || "")
-                    .trim()
-                    .toLowerCase()
-                    .replace(/^@/, "");
-            })
-            .filter(Boolean);
+        return domains.map(normalizeAllowedDomain).filter(Boolean);
     }
 
     function isEmailEligibleForMicrosite(email) {
         var allowed = getAllowedEmailDomains();
-        if (!allowed.length) return { ok: true };
+        if (!allowed.length) {
+            return { ok: false, allowed: allowed, message: "This microsite has no allowed email domains configured." };
+        }
         var parts = String(email || "")
             .trim()
             .toLowerCase()
@@ -606,6 +660,79 @@
         }
     }
 
+    function pickRelatedProducts(allProducts, currentId, categoryName) {
+        var list = (allProducts || []).filter(function (p) {
+            var id = p.productId || p.ProductId || p.id || p.Id;
+            return String(id) !== String(currentId);
+        });
+        if (categoryName) {
+            var sameCat = list.filter(function (p) {
+                return (p.categoryName || p.CategoryName || "") === categoryName;
+            });
+            if (sameCat.length >= 2) list = sameCat;
+        }
+        return list.slice(0, 8);
+    }
+
+    function renderRelatedFromList(products, currentId) {
+        if (window.MicrositeRuntime && window.MicrositeRuntime.renderRelatedProducts) {
+            window.MicrositeRuntime.renderRelatedProducts(products, currentId);
+            return;
+        }
+    }
+
+    async function loadRelatedForProduct(currentId, categoryName) {
+        var products = [];
+        if (window.__MS_LAST_BUNDLE && window.__MS_LAST_BUNDLE.products) {
+            products = window.__MS_LAST_BUNDLE.products;
+        } else {
+            try {
+                var ctx = getContext();
+                if (!ctx.micrositeId) return;
+                var res = await fetch(
+                    getApiBase() +
+                        "/api/microsite-public/by-id?microsite_id=" +
+                        encodeURIComponent(ctx.micrositeId)
+                );
+                if (res.ok) {
+                    var data = await res.json();
+                    if (Array.isArray(data.products)) products = data.products;
+                    else if (data.data && Array.isArray(data.data.assignedProducts)) {
+                        products = data.data.assignedProducts;
+                    }
+                }
+                if (!products.length) {
+                    var res2 = await fetch(
+                        getApiBase() +
+                            "/api/microsite-public/products-by-id?microsite_id=" +
+                            encodeURIComponent(ctx.micrositeId)
+                    );
+                    if (res2.ok) {
+                        var data2 = await res2.json();
+                        if (Array.isArray(data2.products)) products = data2.products;
+                        else if (Array.isArray(data2.data)) products = data2.data;
+                    }
+                }
+            } catch (e) { /* ignore */ }
+        }
+        renderRelatedFromList(pickRelatedProducts(products, currentId, categoryName), currentId);
+    }
+
+    function onMicrositeBundleReady(bundle) {
+        var params = new URLSearchParams(window.location.search);
+        var productId = params.get("id") || params.get("product_id");
+        if (!productId || !bundle || !bundle.products) return;
+        var current = null;
+        if (bundle.products.length) {
+            current = bundle.products.find(function (p) {
+                var id = p.productId || p.ProductId || p.id || p.Id;
+                return String(id) === String(productId);
+            });
+        }
+        var cat = current ? current.categoryName || current.CategoryName || "" : "";
+        renderRelatedFromList(pickRelatedProducts(bundle.products, productId, cat), productId);
+    }
+
     async function initProductPage() {
         var params = new URLSearchParams(window.location.search);
         var productId = params.get("id") || params.get("product_id");
@@ -619,6 +746,12 @@
             return;
         }
         renderProductDetail(p);
+        var cat = p.categoryName || p.CategoryName || "";
+        if (window.__MS_LAST_BUNDLE && window.__MS_LAST_BUNDLE.products) {
+            renderRelatedFromList(pickRelatedProducts(window.__MS_LAST_BUNDLE.products, productId, cat), productId);
+        } else {
+            loadRelatedForProduct(productId, cat);
+        }
     }
 
     function renderCartTable() {
@@ -641,6 +774,17 @@
         if (empty) empty.style.display = "none";
         if (checkoutBtn) checkoutBtn.style.display = "";
         if (continueBtn) continueBtn.style.display = "none";
+
+        if (checkoutBtn && checkoutBtn.dataset.msCheckoutBound !== "1") {
+            checkoutBtn.dataset.msCheckoutBound = "1";
+            checkoutBtn.addEventListener("click", function (e) {
+                var auth = getAuth();
+                if (!auth || !auth.token) {
+                    e.preventDefault();
+                    redirectToLoginWithMessage("Please login to checkout. Redirecting to login...");
+                }
+            });
+        }
 
         var item = items[0];
         item.qty = 1;
@@ -692,28 +836,93 @@
                 (cart[0].name || "Product") +
                 '</strong><div class="text-muted small">Qty: 1</div></div>';
         }
-        if (hint) {
-            hint.textContent = "Ordering: " + (cart[0].name || "Product") + " (qty 1 only)";
-        }
-
         var auth = getAuth();
         if (!auth || !auth.token) {
-            if (hint) hint.textContent = "Please sign in before placing an order.";
-            btn.disabled = true;
+            redirectToLoginWithMessage("Please login to place an order. Redirecting to login...");
             return;
+        }
+
+        if (await userHasPlacedOrder()) {
+            if (hint) {
+                hint.className = "alert alert-warning mb-3";
+                hint.textContent = "One order place only. You have already placed an order on this microsite.";
+            }
+            form.style.display = "none";
+            if (summary) summary.style.display = "none";
+            btn.disabled = true;
+            if (window.iziToast) {
+                iziToast.warning({
+                    title: "Order",
+                    message: "One order place only. You have already placed an order.",
+                    position: "topRight",
+                });
+            }
+            return;
+        }
+
+        await ensureDomainForApi();
+        updateAuthDomainHint();
+
+        var emailInput = form.querySelector('[name="email"]');
+        if (emailInput && auth.user && auth.user.email) {
+            emailInput.value = auth.user.email;
+            emailInput.readOnly = true;
+        }
+        var fnInput = form.querySelector('[name="firstName"]');
+        if (fnInput && auth.user && auth.user.name && !fnInput.value) {
+            fnInput.value = auth.user.name;
+        }
+
+        var loginEmail = (auth.user && auth.user.email) || "";
+        var eligibleLogin = isEmailEligibleForMicrosite(loginEmail);
+        if (!eligibleLogin.ok) {
+            if (hint) {
+                hint.className = "alert alert-warning mb-3";
+                hint.textContent =
+                    eligibleLogin.message ||
+                    "Order can only be placed using allowed email domains: @" + (eligibleLogin.allowed || []).join(", @");
+            }
+            form.style.display = "none";
+            if (summary) summary.style.display = "none";
+            btn.disabled = true;
+            if (window.iziToast) {
+                iziToast.warning({
+                    title: "Not eligible",
+                    message: hint ? hint.textContent : "You are not eligible for this microsite.",
+                    position: "topRight",
+                });
+            }
+            return;
+        }
+
+        if (hint) {
+            hint.className = "text-muted small";
+            hint.textContent = "Ordering: " + (cart[0].name || "Product") + " (one product, qty 1 only)";
         }
 
         btn.addEventListener("click", async function () {
             var ctx = getContext();
             var fd = new FormData(form);
+            var orderEmail = (auth.user && auth.user.email) || (fd.get("email") || "").toString().trim();
+            var eligible = isEmailEligibleForMicrosite(orderEmail);
+            if (!eligible.ok) {
+                iziToast.warning({
+                    title: "Not eligible",
+                    message:
+                        eligible.message ||
+                        "Order can only be placed using allowed email domains: @" + (eligible.allowed || []).join(", @"),
+                    position: "topRight",
+                });
+                return;
+            }
             var body = {
                 micrositeId: ctx.micrositeId || "",
                 domain: ctx.domain || "",
                 productId: Number(cart[0].id),
                 quantity: 1,
-                firstName: (fd.get("firstName") || "").toString().trim(),
+                firstName: (fd.get("firstName") || auth.user?.name || "").toString().trim(),
                 lastName: (fd.get("lastName") || "").toString().trim(),
-                email: (fd.get("email") || auth.user?.email || "").toString().trim(),
+                email: orderEmail,
                 mobile: (fd.get("mobile") || "").toString().trim(),
                 address: (fd.get("address") || "").toString().trim(),
                 city: (fd.get("city") || "").toString().trim(),
@@ -990,5 +1199,6 @@
         clearAuth: clearAuth,
         canAddToCart: canAddToCart,
         getApiBase: getApiBase,
+        onMicrositeBundleReady: onMicrositeBundleReady,
     };
 })();

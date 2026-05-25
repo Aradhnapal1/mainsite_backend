@@ -15,6 +15,7 @@ namespace firstproject.Models.DatabaseLayer
         Task<int> CreateMicrositeOtp(long micrositeId, string email, string otp, DateTime expiresAtUtc);
         Task<bool> VerifyMicrositeOtp(long micrositeId, string email, string otp);
         Task<MicrositePublicUser?> GetMicrositeUserByEmail(long micrositeId, string email);
+        Task<MicrositePublicUser?> GetMicrositeUserById(int userId);
         Task<MicrositePublicUser> UpsertMicrositeUser(long micrositeId, string email, string? name);
         Task<IActionResult> PlaceMicrositeSingleOrder(int userId, long micrositeId, MicrositeSingleOrderRequest request);
         Task<IActionResult> GetMicrositeOrders(int userId, long micrositeId);
@@ -362,6 +363,26 @@ RETURNING id, microsite_id, name, email, created_at;";
             };
         }
 
+        public async Task<MicrositePublicUser?> GetMicrositeUserById(int userId)
+        {
+            using var connection = new NpgsqlConnection(this.DbConnection);
+            await connection.OpenAsync();
+            const string sql = @"SELECT id, microsite_id, name, email, created_at FROM microsite_users WHERE id=@uid LIMIT 1;";
+            using var cmd = new NpgsqlCommand(sql, connection);
+            cmd.Parameters.AddWithValue("@uid", userId);
+            using var reader = await cmd.ExecuteReaderAsync();
+            if (!await reader.ReadAsync())
+                return null;
+            return new MicrositePublicUser
+            {
+                Id = Convert.ToInt32(reader["id"]),
+                MicrositeId = Convert.ToInt64(reader["microsite_id"]),
+                Name = reader["name"]?.ToString() ?? "",
+                Email = reader["email"]?.ToString() ?? "",
+                CreatedAt = Convert.ToDateTime(reader["created_at"])
+            };
+        }
+
         public async Task<IActionResult> PlaceMicrositeSingleOrder(int userId, long micrositeId, MicrositeSingleOrderRequest request)
         {
             using var connection = new NpgsqlConnection(this.DbConnection);
@@ -387,11 +408,25 @@ LIMIT 1;";
                 if (stock < request.Quantity)
                     return new BadRequestObjectResult(new { status = false, message = "Stock available nahi hai." });
 
+                if (request.Quantity != 1)
+                    return new BadRequestObjectResult(new { status = false, message = "One order place only. Only 1 quantity is allowed." });
+
                 var price = pReader["discountprice"] == DBNull.Value
                     ? Convert.ToDecimal(pReader["price"])
                     : Convert.ToDecimal(pReader["discountprice"]);
                 var productName = pReader["productname"]?.ToString() ?? "";
                 await pReader.CloseAsync();
+
+                const string existingOrderSql = @"
+SELECT COUNT(1) FROM microsite_orders
+WHERE microsite_user_id = @uid AND microsite_id = @mid
+  AND COALESCE(status, '') <> 'Cancelled';";
+                using var existingCmd = new NpgsqlCommand(existingOrderSql, connection, tx);
+                existingCmd.Parameters.AddWithValue("@uid", userId);
+                existingCmd.Parameters.AddWithValue("@mid", micrositeId);
+                var existingCount = Convert.ToInt32(await existingCmd.ExecuteScalarAsync());
+                if (existingCount > 0)
+                    return new BadRequestObjectResult(new { status = false, message = "One order place only. You have already placed an order on this microsite." });
 
                 var total = price * request.Quantity;
                 const string insertSql = @"
@@ -535,9 +570,17 @@ LIMIT 1;";
             var list = new List<object>();
             const string sql = @"
 SELECT mo.id, mo.product_id, p.productname, mo.quantity, mo.unit_price, mo.total_price, mo.status, mo.created_at,
-       mo.first_name, mo.last_name, mo.email, mo.mobile
+       mo.first_name, mo.last_name, mo.email, mo.mobile,
+       COALESCE(
+         NULLIF(TRIM(mu.name), ''),
+         NULLIF(TRIM(BOTH FROM CONCAT_WS(' ', mo.first_name, mo.last_name)), ''),
+         NULLIF(SPLIT_PART(mo.email, '@', 1), ''),
+         '-'
+       ) AS user_name,
+       COALESCE(NULLIF(TRIM(mu.email), ''), mo.email) AS user_email
 FROM microsite_orders mo
 JOIN product p ON p.id = mo.product_id
+LEFT JOIN microsite_users mu ON mu.id = mo.microsite_user_id
 WHERE mo.microsite_id = @mid
 ORDER BY mo.id DESC;";
 
@@ -546,6 +589,8 @@ ORDER BY mo.id DESC;";
             using var reader = await cmd.ExecuteReaderAsync();
             while (await reader.ReadAsync())
             {
+                var userName = reader["user_name"]?.ToString() ?? "";
+                var userEmail = reader["user_email"]?.ToString() ?? "";
                 list.Add(new
                 {
                     id = Convert.ToInt32(reader["id"]),
@@ -556,12 +601,16 @@ ORDER BY mo.id DESC;";
                     totalPrice = Convert.ToDecimal(reader["total_price"]),
                     status = reader["status"]?.ToString(),
                     createdAt = Convert.ToDateTime(reader["created_at"]),
+                    userName,
+                    userEmail,
                     customer = new
                     {
                         firstName = reader["first_name"]?.ToString(),
                         lastName = reader["last_name"]?.ToString(),
                         email = reader["email"]?.ToString(),
-                        mobile = reader["mobile"]?.ToString()
+                        mobile = reader["mobile"]?.ToString(),
+                        name = userName,
+                        userEmail
                     }
                 });
             }

@@ -1,5 +1,6 @@
 using firstproject.Helpers;
 using Microsoft.AspNetCore.Mvc;
+using System.Linq;
 using System.Text;
 
 namespace firstproject.Models.BusinessLayer
@@ -85,6 +86,15 @@ namespace firstproject.Models.BusinessLayer
                 var allowed = (d ?? "").Trim().ToLowerInvariant();
                 if (allowed.StartsWith("@"))
                     allowed = allowed[1..];
+                if (allowed.Contains("://"))
+                {
+                    try
+                    {
+                        var uri = new Uri(allowed.Contains("://") ? allowed : "https://" + allowed);
+                        allowed = uri.Host.ToLowerInvariant();
+                    }
+                    catch { /* keep raw */ }
+                }
                 return emailDomain == allowed || emailDomain.EndsWith("." + allowed, StringComparison.Ordinal);
             });
         }
@@ -92,12 +102,21 @@ namespace firstproject.Models.BusinessLayer
         private async Task<IActionResult?> ValidateMicrositeEmailDomain(long micrositeId, string email)
         {
             var domains = await _databaseLayer.GetMicrositeDomains(micrositeId);
-            if (!IsEmailEligibleForDomains(email, domains))
+            if (domains == null || domains.Count == 0)
             {
                 return new BadRequestObjectResult(new
                 {
                     status = false,
-                    message = "You are not eligible for this microsite."
+                    message = "This microsite has no allowed email domains configured."
+                });
+            }
+            if (!IsEmailEligibleForDomains(email, domains))
+            {
+                var hint = string.Join(", ", domains.Select(d => "@" + (d ?? "").Trim().TrimStart('@')));
+                return new BadRequestObjectResult(new
+                {
+                    status = false,
+                    message = $"Order can only be placed using allowed email domains: {hint}."
                 });
             }
             return null;
@@ -208,7 +227,7 @@ namespace firstproject.Models.BusinessLayer
             if (request.ProductId <= 0)
                 return new BadRequestObjectResult(new { status = false, message = "Product required hai." });
             if (request.Quantity != 1)
-                return new BadRequestObjectResult(new { status = false, message = "Microsite me sirf 1 product ka order allow hai." });
+                return new BadRequestObjectResult(new { status = false, message = "One order place only. Only 1 quantity is allowed." });
 
             var helper = new JwtHelper(_configuration);
             var userId = helper.GetUserIdFromToken(token);
@@ -218,6 +237,25 @@ namespace firstproject.Models.BusinessLayer
             var microsite = await ResolveMicrositeForPublic(request.MicrositeId, request.Domain);
             if (microsite == null)
                 return new NotFoundObjectResult(new { status = false, message = "Microsite domain invalid hai." });
+
+            var dbUser = await _databaseLayer.GetMicrositeUserById(userId.Value);
+            if (dbUser == null)
+                return new UnauthorizedObjectResult(new { status = false, message = "User not found." });
+            if (dbUser.MicrositeId != microsite.MicrositeId)
+                return new BadRequestObjectResult(new { status = false, message = "User does not belong to this microsite." });
+
+            request.Email = dbUser.Email.Trim();
+            var domainCheck = await ValidateMicrositeEmailDomain(microsite.MicrositeId, request.Email);
+            if (domainCheck != null)
+                return domainCheck;
+
+            if (string.IsNullOrWhiteSpace(request.FirstName))
+            {
+                if (!string.IsNullOrWhiteSpace(dbUser.Name))
+                    request.FirstName = dbUser.Name.Trim();
+                else if (!string.IsNullOrWhiteSpace(dbUser.Email) && dbUser.Email.Contains('@'))
+                    request.FirstName = dbUser.Email.Split('@')[0];
+            }
 
             var result = await _databaseLayer.PlaceMicrositeSingleOrder(userId.Value, microsite.MicrositeId, request);
             if (result is OkObjectResult ok && ok.Value != null)
@@ -273,20 +311,25 @@ namespace firstproject.Models.BusinessLayer
         private string BuildOrderEmailHtml(MicrositeResolvedData microsite, MicrositeSingleOrderRequest request, object responseData)
         {
             var headerColor = ((dynamic)microsite.Theme)?.headerColor?.ToString() ?? "#111827";
-            var textColor = ((dynamic)microsite.Theme)?.textColor?.ToString() ?? "#111111";
             var buttonColor = ((dynamic)microsite.Theme)?.buttonColor?.ToString() ?? "#2563eb";
+            var bodyTextColor = "#1f2937";
+            var mutedColor = "#6b7280";
+            var customerName = $"{request.FirstName} {request.LastName}".Trim();
+            if (string.IsNullOrWhiteSpace(customerName))
+                customerName = "Customer";
 
             var sb = new StringBuilder();
-            sb.Append($"<div style='font-family:Arial,sans-serif;color:{textColor};max-width:620px;margin:auto;border:1px solid #e5e7eb'>");
-            sb.Append($"<div style='background:{headerColor};padding:16px;color:#fff'><h2 style='margin:0'>{microsite.Name} - Order Confirmation</h2></div>");
-            sb.Append("<div style='padding:16px'>");
-            sb.Append($"<p>Hi {request.FirstName} {request.LastName},</p>");
-            sb.Append("<p>Your order has been placed successfully.</p>");
-            sb.Append($"<p><strong>Product Id:</strong> {request.ProductId}<br/>");
-            sb.Append($"<strong>Quantity:</strong> {request.Quantity}<br/>");
-            sb.Append($"<strong>Delivery Address:</strong> {request.Address}, {request.City}, {request.State}, {request.Pincode}, {request.Country}</p>");
-            sb.Append($"<p><span style='display:inline-block;background:{buttonColor};color:#fff;padding:8px 14px;border-radius:4px'>Thank you for shopping</span></p>");
-            sb.Append("<p style='font-size:12px;color:#6b7280'>This is an automated email from microsite order system.</p>");
+            sb.Append($"<div style='font-family:Arial,sans-serif;max-width:620px;margin:auto;border:1px solid #e5e7eb;background:#ffffff'>");
+            sb.Append($"<div style='background:{headerColor};padding:16px;color:#ffffff'><h2 style='margin:0;color:#ffffff'>{microsite.Name} - Order Confirmation</h2></div>");
+            sb.Append($"<div style='padding:16px;color:{bodyTextColor};background:#ffffff'>");
+            sb.Append($"<p style='color:{bodyTextColor};margin:0 0 12px'>Hi {customerName},</p>");
+            sb.Append($"<p style='color:{bodyTextColor};margin:0 0 12px'>Your order has been placed successfully.</p>");
+            sb.Append($"<p style='color:{bodyTextColor};margin:0 0 12px'><strong style='color:{bodyTextColor}'>Product Id:</strong> {request.ProductId}<br/>");
+            sb.Append($"<strong style='color:{bodyTextColor}'>Quantity:</strong> {request.Quantity}<br/>");
+            sb.Append($"<strong style='color:{bodyTextColor}'>Email:</strong> {request.Email}<br/>");
+            sb.Append($"<strong style='color:{bodyTextColor}'>Delivery Address:</strong> {request.Address}, {request.City}, {request.State}, {request.Pincode}, {request.Country}</p>");
+            sb.Append($"<p style='margin:16px 0'><span style='display:inline-block;background:{buttonColor};color:#ffffff;padding:8px 14px;border-radius:4px'>Thank you for shopping</span></p>");
+            sb.Append($"<p style='font-size:12px;color:{mutedColor};margin:0'>This is an automated email from microsite order system.</p>");
             sb.Append("</div></div>");
             return sb.ToString();
         }
