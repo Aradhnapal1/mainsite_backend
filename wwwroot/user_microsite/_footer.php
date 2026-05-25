@@ -20,7 +20,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/izitoast/dist/js/iziToast.min.js"></script>
-<script src="_microsite-app.js"></script>
+<script src="_microsite-app.js?v=20260526"></script>
 <script src="_runtime.js?v=20260521"></script>
 </body>
 </html>

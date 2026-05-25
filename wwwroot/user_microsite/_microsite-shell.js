@@ -115,12 +115,23 @@
         } catch (e) { /* ignore */ }
     }
 
+    function refreshContextFromBody() {
+        if (!document.body || !global.MICROSITE_CONTEXT) return;
+        var page = document.body.getAttribute("data-ms-page") || "";
+        if (page) global.MICROSITE_CONTEXT.currentPage = page;
+    }
+
     initContext();
     ensureMicrositeIdInUrl();
 
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", applyNavLinks);
-    } else {
+    function onReady() {
+        refreshContextFromBody();
         applyNavLinks();
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", onReady);
+    } else {
+        onReady();
     }
 })(window);

@@ -1,4 +1,4 @@
-﻿using firstproject.Helpers;
+using firstproject.Helpers;
 using Microsoft.AspNetCore.Mvc;
 using System.Text;
 

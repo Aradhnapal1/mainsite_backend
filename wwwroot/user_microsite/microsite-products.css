@@ -1,5 +1,6 @@
 /* Mainsite-style featured product cards for microsite */
-.ms-featured-wrap {
+.ms-featured-wrap,
+section.ms-featured {
     background-color: #f8f8f8;
     padding: 2rem 0 3rem;
     margin: 0 0 2rem;
@@ -106,23 +107,33 @@
     display: none !important;
 }
 
-.ms-featured-wrap .product-action {
+/* Override mainsite style.css: .product-action is hidden until hover + translateY(100%) */
+.ms-featured-wrap .product-action,
+section.ms-featured .product-action,
+.ms-featured-wrap .product:hover .product-action,
+.ms-featured-wrap .product:focus .product-action,
+section.ms-featured .product:hover .product-action,
+section.ms-featured .product:focus .product-action {
     position: absolute;
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 2;
-    opacity: 1;
-    visibility: visible;
+    z-index: 12;
+    display: flex !important;
+    align-items: center;
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: none !important;
     background-color: rgba(255, 255, 255, 0.95);
 }
 
-.ms-featured-wrap .product.product-7 .btn-product {
+.ms-featured-wrap .product.product-7 .btn-product,
+section.ms-featured .product.product-7 .btn-product {
     display: block;
     width: 100%;
     padding: 1.1rem 0;
-    color: #c96;
-    background-color: #fff;
+    color: var(--ms-button-color, #c96) !important;
+    background-color: #fff !important;
     text-transform: uppercase;
     border: none;
     border-bottom: 0.1rem solid #ebebeb;
@@ -132,9 +143,49 @@
     font-weight: 500;
 }
 
-.ms-featured-wrap .product.product-7 .btn-product:hover {
-    color: #c96;
-    background-color: #fff;
+.ms-featured-wrap .product.product-7 .btn-product:before,
+section.ms-featured .product.product-7 .btn-product:before {
+    display: none !important;
+    content: none !important;
+}
+
+.ms-featured-wrap .product.product-7 .btn-product span,
+section.ms-featured .product.product-7 .btn-product span {
+    color: var(--ms-button-color, #c96) !important;
+    box-shadow: none !important;
+}
+
+.ms-featured-wrap .product.product-7 .btn-product:hover,
+.ms-featured-wrap .product.product-7 .btn-product:focus,
+section.ms-featured .product.product-7 .btn-product:hover,
+section.ms-featured .product.product-7 .btn-product:focus {
+    color: var(--ms-button-text-color, #fff) !important;
+    background-color: var(--ms-button-color, #c96) !important;
+    border-bottom-color: var(--ms-button-color, #c96) !important;
+}
+
+.ms-featured-wrap .product.product-7 .btn-product:hover span,
+.ms-featured-wrap .product.product-7 .btn-product:focus span,
+section.ms-featured .product.product-7 .btn-product:hover span,
+section.ms-featured .product.product-7 .btn-product:focus span {
+    color: var(--ms-button-text-color, #fff) !important;
+    box-shadow: none !important;
+}
+
+body.ms-no-hover .ms-featured-wrap .product.product-7 .btn-product:hover,
+body.ms-no-hover .ms-featured-wrap .product.product-7 .btn-product:focus,
+body.ms-no-hover section.ms-featured .product.product-7 .btn-product:hover,
+body.ms-no-hover section.ms-featured .product.product-7 .btn-product:focus {
+    color: var(--ms-button-text-color, #fff) !important;
+    background-color: var(--ms-button-color, #c96) !important;
+    border-bottom-color: var(--ms-button-color, #c96) !important;
+}
+
+body.ms-no-hover .ms-featured-wrap .product.product-7 .btn-product:hover span,
+body.ms-no-hover .ms-featured-wrap .product.product-7 .btn-product:focus span,
+body.ms-no-hover section.ms-featured .product.product-7 .btn-product:hover span,
+body.ms-no-hover section.ms-featured .product.product-7 .btn-product:focus span {
+    color: var(--ms-button-text-color, #fff) !important;
 }
 
 .ms-featured-wrap .product-body {
@@ -215,8 +266,8 @@
     border: 1px solid #eee;
 }
 
-.ms-nav-login,
-.ms-nav-logout {
+.ms-nav-login-guest,
+.ms-account-trigger {
     font-size: 1.35rem;
     line-height: 1;
     display: inline-flex;

@@ -13,8 +13,8 @@ body.ms-no-hover .ms-btn:hover {
     background: var(--ms-header-color);
     color: var(--ms-text-color);
 }
-.ms-header a,
-.ms-header .text-reset {
+.ms-header a:not(.dropdown-item),
+.ms-header .text-reset:not(.dropdown-item) {
     color: var(--ms-text-color);
 }
 .ms-footer {
@@ -213,4 +213,60 @@ body.ms-no-hover .ms-btn:hover {
     .ms-header-nav--desktop {
         display: flex !important;
     }
+}
+
+.ms-nav-login-guest,
+.ms-account-trigger {
+    font-size: 1.35rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+}
+
+.ms-account-trigger::after {
+    display: none;
+}
+
+.ms-account-dropdown {
+    position: relative;
+}
+
+.ms-account-menu {
+    min-width: 10rem;
+    border-radius: 8px;
+    padding: 0.35rem 0;
+    z-index: 1050;
+    background-color: #fff !important;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* Dropdown items must not inherit header light text color */
+.ms-header .ms-account-menu .dropdown-item {
+    font-size: 0.95rem;
+    padding: 0.45rem 1rem;
+    color: #212529 !important;
+    background-color: transparent;
+}
+
+.ms-header .ms-account-menu .dropdown-item:hover,
+.ms-header .ms-account-menu .dropdown-item:focus {
+    color: #212529 !important;
+    background-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+.ms-header .ms-account-menu .ms-nav-logout-action {
+    color: #dc3545 !important;
+    font-weight: 600;
+}
+
+.ms-header .ms-account-menu .ms-nav-logout-action:hover,
+.ms-header .ms-account-menu .ms-nav-logout-action:focus {
+    color: #fff !important;
+    background-color: #dc3545 !important;
+}
+
+.ms-header .ms-account-menu .dropdown-divider {
+    border-color: rgba(0, 0, 0, 0.1);
+    margin: 0.35rem 0;
 }

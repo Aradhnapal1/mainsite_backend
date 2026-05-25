@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
     var API_BASE = window.MICROSITE_API_BASE || window.API_BASE || window.domain || "http://microsite_backend.workarya.com";
 
     function safeText(value, fallback) {
@@ -569,14 +569,15 @@
         var query = params.toString();
         if (!query) return;
 
-        document.querySelectorAll(".ms-header-nav a, .ms-offcanvas-nav a, .ms-nav-home, .ms-cart-link").forEach(
-            function (link) {
-                if (link.classList.contains("ms-nav-logout")) return;
-                var href = link.getAttribute("href") || getIndexPage();
-                var clean = href.split("?")[0];
-                link.setAttribute("href", clean + "?" + query);
-            }
-        );
+        document.querySelectorAll(
+            ".ms-header-nav a, .ms-offcanvas-nav a, .ms-offcanvas-account a, .ms-account-menu a, .ms-nav-home, .ms-cart-link, .ms-nav-login-guest"
+        ).forEach(function (link) {
+            if (link.classList.contains("ms-nav-logout-action")) return;
+            if (link.classList.contains("dropdown-toggle")) return;
+            var href = link.getAttribute("href") || getIndexPage();
+            var clean = href.split("?")[0];
+            link.setAttribute("href", clean + "?" + query);
+        });
     }
 
     document.addEventListener("DOMContentLoaded", async function () {

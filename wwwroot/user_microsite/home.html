@@ -13,11 +13,11 @@ require __DIR__ . '/_header.php';
         <p id="msContent" class="mb-0 text-muted">Microsite content will be loaded from backend values.</p>
     </div>
 </section>
-<section class="ms-featured bg-light py-5 mb-4">
-    <div class="container-fluid">
-        <div class="heading heading-center mb-4"><h2 class="title">FEATURED PRODUCTS</h2></div>
-        <div class="row justify-content-center" id="msProducts"></div>
+<div class="ms-featured-wrap" id="msProductsSection">
+    <div class="container-fluid px-3 px-lg-4">
+        <div class="row g-3 justify-content-center" id="msProducts"></div>
+        <p id="msProductsEmpty" class="ms-products-empty" style="display:none;">This microsite do not have products.</p>
     </div>
-</section>
+</div>
 
 <?php require __DIR__ . '/_footer.php'; ?>

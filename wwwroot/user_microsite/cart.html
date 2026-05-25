@@ -9,13 +9,14 @@ require __DIR__ . '/_header.php';
     <p id="msCartEmpty" class="text-muted" style="display:none;">Your cart is empty.</p>
     <div class="table-responsive">
         <table class="table align-middle">
-            <thead><tr><th></th><th>Product</th><th>Qty</th><th>Total</th><th></th></tr></thead>
+            <thead><tr><th></th><th>Product</th><th></th></tr></thead>
             <tbody id="msCartBody"></tbody>
         </table>
     </div>
-    <div class="d-flex justify-content-between align-items-center mt-3">
-        <strong>Grand Total: <span id="msCartTotal">?0</span></strong>
-        <a href="#" data-ms-href="checkout" class="btn ms-btn">Go To Checkout</a>
+    <div class="d-flex justify-content-between align-items-center mt-3 flex-wrap gap-2">
+        <strong>Grand Total: <span id="msCartTotal">₹0</span></strong>
+        <a href="#" id="msCartCheckoutBtn" data-ms-href="checkout" class="btn ms-btn" style="display:none;">Go To Checkout</a>
+        <a href="#" id="msCartContinueBtn" data-ms-nav="index" class="btn ms-btn">Continue Shopping</a>
     </div>
 </section>
 

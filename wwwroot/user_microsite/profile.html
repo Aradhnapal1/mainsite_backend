@@ -1,0 +1,15 @@
+<?php
+$pageTitle = 'My Profile';
+$currentPage = 'profile';
+require __DIR__ . '/_header.php';
+?>
+
+<section class="card p-4 shadow-sm mx-auto" style="max-width:480px;">
+    <h2 class="mb-3">My Profile</h2>
+    <p class="mb-1"><strong>Name:</strong> <span id="msProfileName">-</span></p>
+    <p class="mb-3"><strong>Email:</strong> <span id="msProfileEmail">-</span></p>
+    <a href="#" data-ms-nav="order" class="btn ms-btn me-2">My Orders</a>
+    <a href="#" data-ms-nav="index" class="btn btn-outline-secondary">Home</a>
+</section>
+
+<?php require __DIR__ . '/_footer.php'; ?>

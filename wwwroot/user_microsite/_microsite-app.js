@@ -12,6 +12,38 @@
         return ctx;
     }
 
+    function getCurrentPage() {
+        if (document.body) {
+            var fromBody = document.body.getAttribute("data-ms-page");
+            if (fromBody) return fromBody;
+        }
+        var ctxPage = window.MICROSITE_CONTEXT && window.MICROSITE_CONTEXT.currentPage;
+        if (ctxPage) return ctxPage;
+        var path = (window.location.pathname || "").toLowerCase();
+        if (path.indexOf("login") >= 0) return "login";
+        if (path.indexOf("register") >= 0) return "register";
+        if (path.indexOf("profile") >= 0) return "profile";
+        if (path.indexOf("checkout") >= 0) return "checkout";
+        if (path.indexOf("order-details") >= 0) return "order-details";
+        if (path.indexOf("order") >= 0) return "order";
+        if (path.indexOf("cart") >= 0) return "cart";
+        if (path.indexOf("product") >= 0) return "product";
+        if (path.indexOf("contact") >= 0) return "contact";
+        return "";
+    }
+
+    function msNotify(type, options) {
+        var opts = options || {};
+        if (window.iziToast && typeof window.iziToast[type] === "function") {
+            window.iziToast[type](opts);
+            return;
+        }
+        var msg = opts.message || opts.title || "Notice";
+        if (type === "error") console.error(msg);
+        else console.log(msg);
+        if (typeof window.alert === "function") window.alert(msg);
+    }
+
     function getPageExt() {
         return ".html";
     }
@@ -158,51 +190,61 @@
         return null;
     }
 
+    function handleLogout() {
+        clearAuth();
+        closeMobileNav();
+        document.querySelectorAll(".dropdown-menu.show").forEach(function (menu) {
+            menu.classList.remove("show");
+        });
+        document.querySelectorAll(".dropdown-toggle.show").forEach(function (toggle) {
+            toggle.classList.remove("show");
+            toggle.setAttribute("aria-expanded", "false");
+        });
+        msNotify("info", { title: "Logout", message: "Logged out.", position: "topRight" });
+        updateAuthNav();
+        preserveHeaderLinks();
+    }
+
     function updateAuthNav() {
         var auth = getAuth();
-        var logins = document.querySelectorAll(".ms-nav-login");
-        if (!logins.length) return;
+        var isLoggedIn = !!(auth && auth.token);
 
-        if (auth && auth.token) {
-            logins.forEach(function (login) {
-                login.style.display = "none";
+        document.querySelectorAll(".ms-nav-login-guest").forEach(function (el) {
+            el.style.display = isLoggedIn ? "none" : "";
+            el.href = pageUrl("login");
+        });
+
+        document.querySelectorAll(".ms-account-dropdown").forEach(function (el) {
+            el.style.display = isLoggedIn ? "" : "none";
+        });
+
+        document.querySelectorAll(".ms-offcanvas-guest").forEach(function (el) {
+            el.style.display = isLoggedIn ? "none" : "";
+        });
+
+        document.querySelectorAll(".ms-offcanvas-account").forEach(function (el) {
+            el.style.display = isLoggedIn ? "block" : "none";
+        });
+    }
+
+    function initAccountNav() {
+        document.querySelectorAll(".ms-nav-logout-action").forEach(function (el) {
+            if (el.dataset.msLogoutBound === "1") return;
+            el.dataset.msLogoutBound = "1";
+            el.addEventListener("click", function (e) {
+                e.preventDefault();
+                handleLogout();
             });
-            document.querySelectorAll(".ms-nav-orders").forEach(function (orders) {
-                orders.style.display = "";
-                orders.href = pageUrl("order");
-            });
-            document.querySelectorAll(".ms-nav-logout").forEach(function (logout) {
-                logout.style.display = "";
-                logout.href = "#";
-                logout.onclick = function (e) {
-                    e.preventDefault();
-                    clearAuth();
-                    closeMobileNav();
-                    if (window.iziToast) {
-                        iziToast.info({ title: "Logout", message: "Logged out.", position: "topRight" });
-                    }
-                    updateAuthNav();
-                };
-            });
-        } else {
-            logins.forEach(function (login) {
-                login.style.display = "";
-                if (login.classList.contains("nav-link")) {
-                    login.innerHTML = '<i class="icon-user me-1"></i> Login';
-                } else {
-                    login.innerHTML = '<i class="icon-user"></i>';
-                }
-                login.href = pageUrl("login");
-                login.onclick = null;
-            });
-            document.querySelectorAll(".ms-nav-orders").forEach(function (orders) {
-                orders.style.display = "none";
-            });
-            document.querySelectorAll(".ms-nav-logout").forEach(function (logout) {
-                logout.style.display = "none";
-                logout.onclick = null;
-            });
-        }
+        });
+    }
+
+    function initProfilePage() {
+        if (!requireAuth("login")) return;
+        var auth = getAuth();
+        var nameEl = document.getElementById("msProfileName");
+        var emailEl = document.getElementById("msProfileEmail");
+        if (nameEl) nameEl.textContent = (auth.user && auth.user.name) || "-";
+        if (emailEl) emailEl.textContent = (auth.user && auth.user.email) || "-";
     }
 
     function normalizeProduct(p) {
@@ -413,11 +455,11 @@
             var email = (emailEl.value || "").trim();
             var name = nameEl ? (nameEl.value || "").trim() : "";
             if (!email) {
-                iziToast.warning({ title: "Email", message: "Please enter your email.", position: "topRight" });
+                msNotify("warning", { title: "Email", message: "Please enter your email.", position: "topRight" });
                 return;
             }
             if (!getContext().micrositeId && !getContext().domain) {
-                iziToast.warning({
+                msNotify("warning", {
                     title: "Microsite",
                     message: "Add microsite_id to the URL.",
                     position: "topRight",
@@ -425,14 +467,14 @@
                 return;
             }
             if (mode === "register" && !name) {
-                iziToast.warning({ title: "Name", message: "Name is required to register.", position: "topRight" });
+                msNotify("warning", { title: "Name", message: "Name is required to register.", position: "topRight" });
                 return;
             }
 
             await ensureMicrositeDomains();
             var eligible = isEmailEligibleForMicrosite(email);
             if (!eligible.ok) {
-                iziToast.error({
+                msNotify("error", {
                     title: "Not eligible",
                     message: "You are not eligible for this microsite.",
                     position: "topRight",
@@ -446,16 +488,16 @@
                 if (data.status) {
                     showOtpStep();
                     sendBtn.textContent = "Resend OTP";
-                    iziToast.success({ title: "OTP", message: data.message || "OTP sent successfully.", position: "topRight" });
+                    msNotify("success", { title: "OTP", message: data.message || "OTP sent successfully.", position: "topRight" });
                 } else {
-                    iziToast.error({
+                    msNotify("error", {
                         title: "OTP",
                         message: data.message || "OTP could not be sent.",
                         position: "topRight",
                     });
                 }
             } catch (e) {
-                iziToast.error({ title: "OTP", message: "Server error. Check API URL or CORS.", position: "topRight" });
+                msNotify("error", { title: "OTP", message: "Server error. Check API URL or CORS.", position: "topRight" });
             } finally {
                 sendBtn.disabled = false;
             }
@@ -466,17 +508,17 @@
             var otp = (otpEl && otpEl.value ? otpEl.value : "").trim();
             var name = nameEl ? (nameEl.value || "").trim() : "";
             if (!email || !otp) {
-                iziToast.warning({ title: "Verify", message: "Email and OTP are required.", position: "topRight" });
+                msNotify("warning", { title: "Verify", message: "Email and OTP are required.", position: "topRight" });
                 return;
             }
             if (mode === "register" && !name) {
-                iziToast.warning({ title: "Name", message: "Name is required.", position: "topRight" });
+                msNotify("warning", { title: "Name", message: "Name is required.", position: "topRight" });
                 return;
             }
 
             var eligible = isEmailEligibleForMicrosite(email);
             if (!eligible.ok) {
-                iziToast.error({
+                msNotify("error", {
                     title: "Not eligible",
                     message: "You are not eligible for this microsite.",
                     position: "topRight",
@@ -489,17 +531,17 @@
                 var data = await verifyOtp(email, otp, name || undefined);
                 if (data.status && data.data) {
                     saveAuth({ token: data.data.token, user: data.data.user });
-                    iziToast.success({
+                    msNotify("success", {
                         title: "Success",
                         message: data.message || "Login successful.",
                         position: "topRight",
                     });
                     window.location.href = pageUrl("index");
                 } else {
-                    iziToast.error({ title: "Verify", message: data.message || "OTP invalid.", position: "topRight" });
+                    msNotify("error", { title: "Verify", message: data.message || "OTP invalid.", position: "topRight" });
                 }
             } catch (e) {
-                iziToast.error({ title: "Verify", message: "Server error.", position: "topRight" });
+                msNotify("error", { title: "Verify", message: "Server error.", position: "topRight" });
             } finally {
                 verifyBtn.disabled = false;
             }
@@ -583,6 +625,8 @@
         var tbody = document.getElementById("msCartBody");
         var empty = document.getElementById("msCartEmpty");
         var totalEl = document.getElementById("msCartTotal");
+        var checkoutBtn = document.getElementById("msCartCheckoutBtn");
+        var continueBtn = document.getElementById("msCartContinueBtn");
         if (!tbody) return;
 
         var items = getCart();
@@ -590,9 +634,13 @@
         if (!items.length) {
             if (empty) empty.style.display = "block";
             if (totalEl) totalEl.textContent = "₹0";
+            if (checkoutBtn) checkoutBtn.style.display = "none";
+            if (continueBtn) continueBtn.style.display = "";
             return;
         }
         if (empty) empty.style.display = "none";
+        if (checkoutBtn) checkoutBtn.style.display = "";
+        if (continueBtn) continueBtn.style.display = "none";
 
         var item = items[0];
         item.qty = 1;
@@ -603,8 +651,6 @@
             lineItemImageHtml(item.image, item.name) +
             "</td><td>" +
             (item.name || "Product") +
-            "</td><td>1</td><td>₹" +
-            line.toFixed(2) +
             '</td><td><button type="button" class="btn btn-sm btn-outline-danger ms-remove-cart" data-id="' +
             item.id +
             '">Remove</button></td>';
@@ -714,15 +760,16 @@
     function preserveHeaderLinks() {
         var query = getContextQuery().replace(/^\?/, "");
         if (!query) return;
-        document.querySelectorAll(".ms-header-nav a, .ms-offcanvas-nav a, .ms-nav-home, .ms-cart-link").forEach(
-            function (link) {
-                if (link.classList.contains("ms-nav-logout")) return;
-                var href = link.getAttribute("href") || "";
-                if (!href || href === "#") return;
-                var clean = href.split("?")[0];
-                link.setAttribute("href", clean + "?" + query);
-            }
-        );
+        document.querySelectorAll(
+            ".ms-header-nav a, .ms-offcanvas-nav a, .ms-offcanvas-account a, .ms-account-menu a, .ms-nav-home, .ms-cart-link, .ms-nav-login-guest"
+        ).forEach(function (link) {
+            if (link.classList.contains("ms-nav-logout-action")) return;
+            if (link.classList.contains("dropdown-toggle")) return;
+            var href = link.getAttribute("href") || "";
+            if (!href || href === "#") return;
+            var clean = href.split("?")[0];
+            link.setAttribute("href", clean + "?" + query);
+        });
     }
 
     function initMobileNav() {
@@ -889,11 +936,13 @@
         preserveHeaderLinks();
         initMobileNav();
         updateCartBadge();
+        initAccountNav();
         updateAuthNav();
 
-        var page = (window.MICROSITE_CONTEXT && window.MICROSITE_CONTEXT.currentPage) || "";
+        var page = getCurrentPage();
         if (page === "login") initAuthForm("login");
         if (page === "register") initAuthForm("register");
+        if (page === "profile") initProfilePage();
         if (page === "product") initProductPage();
         if (page === "cart") renderCartTable();
         if (page === "checkout") initCheckoutPage();
